@@ -1151,8 +1151,8 @@ private fun AppleMusicLyricLineItem(
     )
 
     // Taille CONSTANTE : l'accentuation passe uniquement par scale / alpha / graisse (aucun relayout).
-    val fontSize = if (isFullScreen) 30.sp else 26.sp
-    val lineHeight = if (isFullScreen) 38.sp else 34.sp
+    val fontSize = if (isFullScreen) 30.sp else 22.sp
+    val lineHeight = if (isFullScreen) 38.sp else 29.sp
 
     val targetBlur = if (isBlurEnabled && !isActive && isSynced) {
         if (activeIndex < 0) {
@@ -1202,7 +1202,7 @@ private fun AppleMusicLyricLineItem(
                     Modifier
                 }
             )
-            .padding(vertical = if (isFullScreen) 10.dp else 8.dp),
+            .padding(vertical = if (isFullScreen) 10.dp else 6.dp),
     ) {
         // Glowing ambient halo behind active line when blur effect is enabled
         if (animatedGlowAlpha > 0.01f) {
@@ -1236,16 +1236,8 @@ private fun AppleMusicLyricLineItem(
 /**
  * Paroles de la carte "en cours de lecture" : Defilement continu fluide et centre.
  *
- * Toutes les lignes sont rendues dans une colonne animee par translation GPU
- * (translationY) pour garder la ligne active au focus (~24dp).
- *
- * Avantages :
- *  - Animation parfaitement fluide sans re-layout ni a-coups (glide continu) ;
- *  - Fondu directement dans la couleur de la carte (aucun trait disgracieux, aucune coupure) ;
- *  - Chaque vers actif avance et fait defiler la liste au fil de la chanson ;
- *  - En intro (activeIndex < 0) : les premieres lignes s'affichent proprement des le haut ;
- *  - Aucun geste de defilement interne n'interfere avec la page principale ;
- *  - Un tap n'importe ou ouvre la vue plein ecran.
+ * Aligne toujours le defilement sur le vers precedent entier (sans AUCUN vers tronque
+ * ni coupe au bord superieur), avec le vers actif juste en-dessous en plein focus.
  */
 @Composable
 private fun InPageSyncedLyrics(
@@ -1265,14 +1257,14 @@ private fun InPageSyncedLyrics(
     }
 
     val lineTops = remember(lyrics) { mutableStateMapOf<Int, Float>() }
-    val density = LocalDensity.current
-    val focalOffsetPx = with(density) { 24.dp.toPx() }
 
-    val currentTop = lineTops[activeIndex]
-    val targetY = if (activeIndex <= 0 || currentTop == null) {
+    // Aligne le defilement sur le debut du vers precedent :
+    // Le vers precedent commence a y=0 (entier, jamais coupe en deux)
+    // Le vers actif est juste en-dessous (entier, en vedette avec son halo)
+    val targetY = if (activeIndex <= 0) {
         0f
     } else {
-        (currentTop - focalOffsetPx).coerceAtLeast(0f)
+        lineTops[activeIndex - 1] ?: 0f
     }
 
     val animatedY by animateFloatAsState(
@@ -1284,7 +1276,7 @@ private fun InPageSyncedLyrics(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(250.dp)
+            .height(270.dp)
             .clipToBounds()
             .pointerInput(Unit) { detectTapGestures { onOpenFullScreen() } },
         contentAlignment = Alignment.TopStart,
@@ -1321,13 +1313,13 @@ private fun InPageSyncedLyrics(
             }
         }
 
-        // Fondu superieur doux dans la couleur de la carte (uniquement apres defilement)
-        val topOverlayAlpha = (animatedY / 30f).coerceIn(0f, 1f)
+        // Fondu superieur discret (uniquement pendant la transition de defilement)
+        val topOverlayAlpha = (animatedY / 24f).coerceIn(0f, 1f)
         if (topOverlayAlpha > 0.01f) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(36.dp)
+                    .height(20.dp)
                     .align(Alignment.TopCenter)
                     .alpha(topOverlayAlpha)
                     .background(
@@ -1338,11 +1330,11 @@ private fun InPageSyncedLyrics(
             )
         }
 
-        // Fondu inferieur progressif dans le fond de la carte : AUCUNE ligne ni coupure
+        // Fondu inferieur tres fin au bord de la carte
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp)
+                .height(24.dp)
                 .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
