@@ -101,7 +101,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -121,7 +120,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
