@@ -1507,6 +1507,9 @@ fun PlaylistDetailScreen(
             },
             equalPowerVolume = state.mixConfig.equalPowerVolume,
             durationSeconds = state.mixConfig.durationSeconds,
+            outroOffsetMs = state.mixConfig.outroOffsetMs,
+            introSkipMs = state.mixConfig.introSkipMs,
+            onTimingChange = { outroMs, introMs -> viewModel.setBridgeTiming(outroMs, introMs) },
             onDismiss = viewModel::dismissTransitionBridgeSheet,
         )
     }

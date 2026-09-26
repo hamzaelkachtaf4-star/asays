@@ -1616,6 +1616,256 @@ private fun MixCurvePreview(
     }
 }
 
+/**
+ * Reglages MANUELS de la transition (l'equivalent du "deplace les morceaux" de
+ * Spotify) : on choisit ou le morceau sortant quitte et ou l'entrant demarre.
+ * Les valeurs sont appliquees par PlaybackController (transitionStartMs) et
+ * persistent dans PlaylistMixStore.
+ */
+@Composable
+private fun MixManualTimingCard(
+    outroOffsetMs: Long,
+    introSkipMs: Long,
+    durationSeconds: Float,
+    onTimingChange: (Long, Long) -> Unit,
+) {
+    // Couleurs capturees AVANT les lambdas : getters @Composable du theme.
+    val accent = SpotifyGreen
+    val titleColor = TextPrimary
+    val hintColor = TextSecondary
+
+    val outroSeconds = (outroOffsetMs / 1000f).coerceIn(-20f, 0f)
+    val introSeconds = (introSkipMs / 1000f).coerceIn(0f, 20f)
+    val us = java.util.Locale.US
+
+    Surface(
+        color = SurfaceCard,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.Tune,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Manual timing",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = titleColor,
+                    )
+                    Text(
+                        text = "Move where each track enters and exits",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = hintColor,
+                    )
+                }
+                TextButton(onClick = { onTimingChange(0L, 0L) }) {
+                    Text(
+                        text = "Reset",
+                        color = accent,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            MixTimingBar(
+                outroOffsetSeconds = outroSeconds,
+                introSkipSeconds = introSeconds,
+                blendSeconds = durationSeconds,
+            )
+
+            Spacer(Modifier.height(14.dp))
+
+            MixTimingSlider(
+                title = "Outgoing exit",
+                valueText = if (outroOffsetMs == 0L) {
+                    "At the natural end"
+                } else {
+                    "Leaves " + String.format(us, "%.1f", -outroSeconds) + "s early"
+                },
+                value = outroSeconds,
+                range = -20f..0f,
+                onChange = { onTimingChange((it * 1000f).toLong(), introSkipMs) },
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            MixTimingSlider(
+                title = "Incoming entry",
+                valueText = if (introSkipMs == 0L) {
+                    "From the first second"
+                } else {
+                    "Skips " + String.format(us, "%.1f", introSeconds) + "s of intro"
+                },
+                value = introSeconds,
+                range = 0f..20f,
+                onChange = { onTimingChange(outroOffsetMs, (it * 1000f).toLong()) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun MixTimingSlider(
+    title: String,
+    valueText: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onChange: (Float) -> Unit,
+) {
+    val accent = SpotifyGreen
+    val titleColor = TextPrimary
+    val hintColor = TextSecondary
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = titleColor,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = valueText,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                color = hintColor,
+            )
+        }
+        Slider(
+            value = value,
+            onValueChange = { raw -> onChange(raw.coerceIn(range.start, range.endInclusive)) },
+            valueRange = range,
+            colors = SliderDefaults.colors(
+                thumbColor = accent,
+                activeTrackColor = accent,
+                inactiveTrackColor = Color.White.copy(alpha = 0.16f),
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * Schema du placement de la transition (poids relatifs, aucune waveform inventee) :
+ * le sortant raccourcit quand il quitte plus tot, la zone de blend suit la duree
+ * choisie, l'entrant est decale de l'intro sautee.
+ */
+@Composable
+private fun MixTimingBar(
+    outroOffsetSeconds: Float,
+    introSkipSeconds: Float,
+    blendSeconds: Float,
+) {
+    val outgoingColor = TextSecondary.copy(alpha = 0.55f)
+    val blendColor = SpotifyGreen.copy(alpha = 0.30f)
+    val incomingColor = SpotifyGreen
+    val skipColor = Color.White.copy(alpha = 0.10f)
+    val hintColor = TextSecondary
+    val us = java.util.Locale.US
+
+    val wOut = (40f - (-outroOffsetSeconds / 20f) * 12f).coerceAtLeast(6f)
+    val wBlend = (4f + blendSeconds * 0.9f).coerceAtLeast(4f)
+    val wSkip = introSkipSeconds * 0.5f
+    val wIn = 30f
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(34.dp)
+                .clip(RoundedCornerShape(10.dp)),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(wOut)
+                    .fillMaxHeight()
+                    .background(outgoingColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "OUT",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                    ),
+                    color = Color.White,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(wBlend)
+                    .fillMaxHeight()
+                    .background(blendColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = String.format(us, "%.0fs", blendSeconds),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = Color.White,
+                )
+            }
+            if (wSkip > 0.5f) {
+                Box(
+                    modifier = Modifier
+                        .weight(wSkip)
+                        .fillMaxHeight()
+                        .background(skipColor),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(wIn)
+                    .fillMaxHeight()
+                    .background(incomingColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "IN",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                    ),
+                    color = Color.Black,
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Outgoing leaves here",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                color = hintColor,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "Incoming starts here",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                color = hintColor,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaylistTransitionBridgeSheet(
@@ -1629,6 +1879,9 @@ fun PlaylistTransitionBridgeSheet(
     onResetToDefault: () -> Unit,
     equalPowerVolume: Boolean = true,
     durationSeconds: Float = 6f,
+    outroOffsetMs: Long = 0L,
+    introSkipMs: Long = 0L,
+    onTimingChange: (Long, Long) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1894,6 +2147,17 @@ fun PlaylistTransitionBridgeSheet(
                 mode = currentMode,
                 equalPower = equalPowerVolume,
                 durationSeconds = durationSeconds,
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // Reglages manuels (in/out points) : ou le sortant quitte, ou l'entrant
+            // demarre, combien de temps dure le blend.
+            MixManualTimingCard(
+                outroOffsetMs = outroOffsetMs,
+                introSkipMs = introSkipMs,
+                durationSeconds = durationSeconds,
+                onTimingChange = onTimingChange,
             )
 
             Spacer(Modifier.height(20.dp))

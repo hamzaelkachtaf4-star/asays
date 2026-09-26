@@ -598,6 +598,21 @@ class PlaylistDetailViewModel @Inject constructor(
         playlistMixStore.resetAllOverrides(playlistId)
     }
 
+    /**
+     * Reglages manuels de transition (in/out points) : ou le sortant quitte et ou
+     * l'entrant demarre. Valeurs playlist-level, comme la duree et l'equal-power.
+     */
+    fun setBridgeTiming(outroOffsetMs: Long, introSkipMs: Long) {
+        val current = playlistMixStore.getConfig(playlistId)
+        playlistMixStore.saveConfig(
+            playlistId,
+            current.copy(
+                outroOffsetMs = outroOffsetMs.coerceIn(-PlaylistMixConfig.MAX_OUTRO_SHIFT_MS, 0L),
+                introSkipMs = introSkipMs.coerceIn(0L, PlaylistMixConfig.MAX_INTRO_SKIP_MS),
+            ),
+        )
+    }
+
     fun reorderPlaylistByHarmonicFlow(onDone: () -> Unit = {}) {
         val playlist = _uiState.value.playlist ?: return
         val tracks = playlist.tracks

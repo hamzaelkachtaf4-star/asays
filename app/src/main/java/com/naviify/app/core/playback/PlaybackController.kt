@@ -125,6 +125,9 @@ class PlaybackController @Inject constructor(
     private var transitionJob: Job? = null
     private var isMixTransitionTriggered = false
     private var isTailPrewarmed = false
+    // Reglage manuel : intro du morceau entrant a sauter, memorisee au declenchement
+    // et consommee dans onMediaItemTransition (le morceau doit d'abord etre charge).
+    private var pendingIntroSkipMs = 0L
 
     private fun getOrCreateTailPlayer(): ExoPlayer {
         tailPlayer?.let { return it }
@@ -189,6 +192,12 @@ class PlaybackController @Inject constructor(
                 isTailPrewarmed = false
                 store.setMixBlending(false)
                 controller?.volume = 1.0f
+            }
+            // Reglage manuel : sauter l'intro du morceau qui vient d'entrer.
+            val introSkip = pendingIntroSkipMs
+            if (introSkip > 0L) {
+                pendingIntroSkipMs = 0L
+                runCatching { controller?.seekTo(introSkip) }
             }
             val shouldSleep = _isSleepUntilTrackEnd.value
             if (shouldSleep) {
@@ -615,7 +624,10 @@ class PlaybackController @Inject constructor(
         val overlapMs = (config.durationSeconds * 1000L).toLong().coerceIn(2000L, 12000L)
         if (durationMs <= overlapMs || durationMs < 6000L) return
 
-        val transitionStartMs = durationMs - overlapMs
+        // Reglage manuel (in/out points) : le sortant peut commencer a quitter plus
+        // tot que sa fin naturelle. Le calcul vit dans le domaine pour que l'apercu
+        // de l'UI et l'audio ne divergent jamais.
+        val transitionStartMs = config.transitionStartMs(durationMs, overlapMs)
 
         // 1. Pre-warm tail player 2.5s before transition starts so it is already buffered in memory
         val prewarmStartMs = (transitionStartMs - 2500L).coerceAtLeast(0L)
@@ -671,6 +683,10 @@ class PlaybackController @Inject constructor(
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "Starting DJ mix transition: '${fromTrack.title}' -> '${toTrack.title}' ($transitionMode, ${overlapMs}ms)")
             }
+
+            // Reglage manuel : l'entrant demarre apres son intro (seek applique des
+            // que le morceau est charge, voir onMediaItemTransition).
+            pendingIntroSkipMs = config.introSkipMs.coerceIn(0L, PlaylistMixConfig.MAX_INTRO_SKIP_MS)
 
             if (transitionMode == PlaylistMixMode.SLAM) {
                 // Slam: Instant drop on the beat with zero silence

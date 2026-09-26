@@ -36,6 +36,12 @@ data class PlaylistMixConfig(
     val smartBassSwap: Boolean = true,
     val equalPowerVolume: Boolean = true,
     val transitionOverrides: Map<String, PlaylistMixMode> = emptyMap(),
+    // Reglages MANUELS (in/out points), l'equivalent du "deplace les morceaux"
+    // de Spotify : ou le sortant quitte et ou l'entrant demarre.
+    // outroOffsetMs <= 0 : le sortant commence a quitter plus tot (0 = fin naturelle).
+    // introSkipMs   >= 0 : l'entrant demarre apres son intro (0 = depuis le debut).
+    val outroOffsetMs: Long = 0L,
+    val introSkipMs: Long = 0L,
 ) {
     fun transitionKey(fromTrackId: String, toTrackId: String): String = "${fromTrackId}_${toTrackId}"
 
@@ -66,6 +72,22 @@ data class PlaylistMixConfig(
 
     fun withoutAllOverrides(): PlaylistMixConfig {
         return copy(transitionOverrides = emptyMap())
+    }
+
+    /**
+     * Debut reel du blend dans le morceau sortant : fin naturelle (duree - recouvrement)
+     * decalee par le reglage manuel, bornee pour rester jouable. Utilise par
+     * PlaybackController ET par l'apercu de l'UI pour ne jamais diverger.
+     */
+    fun transitionStartMs(durationMs: Long, overlapMs: Long): Long {
+        val natural = durationMs - overlapMs
+        val shift = outroOffsetMs.coerceIn(-MAX_OUTRO_SHIFT_MS, 0L)
+        return (natural + shift).coerceAtLeast(1_000L)
+    }
+
+    companion object {
+        const val MAX_OUTRO_SHIFT_MS = 30_000L
+        const val MAX_INTRO_SKIP_MS = 30_000L
     }
 }
 

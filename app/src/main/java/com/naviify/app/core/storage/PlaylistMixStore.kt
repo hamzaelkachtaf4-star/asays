@@ -37,6 +37,8 @@ class PlaylistMixStore @Inject constructor(
             val duration = prefs.getFloat("${id}_duration", 6f)
             val bassSwap = prefs.getBoolean("${id}_bass_swap", true)
             val eqVol = prefs.getBoolean("${id}_eq_vol", true)
+            val outroOffset = prefs.getLong("${id}_outro_offset", 0L)
+            val introSkip = prefs.getLong("${id}_intro_skip", 0L)
 
             val overridesJson = prefs.getString("${id}_overrides", null)
             val overrides = mutableMapOf<String, PlaylistMixMode>()
@@ -61,6 +63,8 @@ class PlaylistMixStore @Inject constructor(
                 smartBassSwap = bassSwap,
                 equalPowerVolume = eqVol,
                 transitionOverrides = overrides,
+                outroOffsetMs = outroOffset.coerceIn(-PlaylistMixConfig.MAX_OUTRO_SHIFT_MS, 0L),
+                introSkipMs = introSkip.coerceIn(0L, PlaylistMixConfig.MAX_INTRO_SKIP_MS),
             )
         }
         _configs.value = map
@@ -82,6 +86,8 @@ class PlaylistMixStore @Inject constructor(
             .putBoolean("${playlistId}_bass_swap", config.smartBassSwap)
             .putBoolean("${playlistId}_eq_vol", config.equalPowerVolume)
             .putString("${playlistId}_overrides", overridesJson)
+            .putLong("${playlistId}_outro_offset", config.outroOffsetMs)
+            .putLong("${playlistId}_intro_skip", config.introSkipMs)
             .apply()
 
         val updated = _configs.value.toMutableMap()
