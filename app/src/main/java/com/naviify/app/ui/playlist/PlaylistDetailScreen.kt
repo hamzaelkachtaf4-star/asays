@@ -1505,6 +1505,8 @@ fun PlaylistDetailScreen(
                 viewModel.resetBridgeTransitionMode(fromTrack.id, toTrack.id)
                 Toast.makeText(context, "Reset to default (${state.mixConfig.mode.title})", Toast.LENGTH_SHORT).show()
             },
+            equalPowerVolume = state.mixConfig.equalPowerVolume,
+            durationSeconds = state.mixConfig.durationSeconds,
             onDismiss = viewModel::dismissTransitionBridgeSheet,
         )
     }

@@ -38,6 +38,7 @@ import android.os.SystemClock
 import com.naviify.app.core.storage.PlaylistMixStore
 import com.naviify.app.domain.model.PlaylistMixConfig
 import com.naviify.app.domain.model.PlaylistMixMode
+import com.naviify.app.domain.model.mixGains
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.datasource.cache.CacheDataSource
@@ -767,30 +768,9 @@ class PlaybackController @Inject constructor(
         mode: PlaylistMixMode,
         equalPower: Boolean,
     ): Pair<Float, Float> {
-        return when (mode) {
-            PlaylistMixMode.AUTO, PlaylistMixMode.FADE -> {
-                if (equalPower) {
-                    val outGain = kotlin.math.cos(progress * Math.PI / 2.0).toFloat()
-                    val inGain = kotlin.math.sin(progress * Math.PI / 2.0).toFloat()
-                    Pair(outGain, inGain)
-                } else {
-                    Pair(1f - progress, progress)
-                }
-            }
-            PlaylistMixMode.RISE -> {
-                val outGain = if (progress < 0.75f) 1.0f else ((1f - progress) / 0.25f)
-                val inGain = (progress * progress).coerceIn(0f, 1f)
-                Pair(outGain, inGain)
-            }
-            PlaylistMixMode.MELT -> {
-                val outGain = (1f - progress) * (1f - progress)
-                val inGain = kotlin.math.sqrt(progress.toDouble()).toFloat()
-                Pair(outGain, inGain)
-            }
-            PlaylistMixMode.SLAM -> {
-                Pair(0f, 1f)
-            }
-        }
+        // Les courbes vivent dans le domaine (mixGains) pour que l'apercu dessine
+        // dans l'UI et le gain applique a l'audio ne puissent pas diverger.
+        return mixGains(progress, mode, equalPower)
     }
 
     private fun maybeScrobble() {

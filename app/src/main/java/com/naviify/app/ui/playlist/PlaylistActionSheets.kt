@@ -109,6 +109,14 @@ import com.naviify.app.ui.theme.SurfaceCardHigh
 import com.naviify.app.ui.theme.TextPrimary
 import com.naviify.app.ui.theme.TextSecondary
 import com.naviify.app.ui.theme.ThemeOutline
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.naviify.app.domain.model.mixGains
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1410,6 +1418,197 @@ fun PlaylistMixStudioSheet(
             }
 
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** Icon of a transition mode, shared by both mix sheets so they stay identical. */
+private fun mixModeIcon(mode: PlaylistMixMode): ImageVector = when (mode) {
+    PlaylistMixMode.AUTO -> Icons.Rounded.AutoAwesome
+    PlaylistMixMode.FADE -> Icons.Rounded.GraphicEq
+    PlaylistMixMode.RISE -> Icons.AutoMirrored.Rounded.TrendingUp
+    PlaylistMixMode.MELT -> Icons.Rounded.WaterDrop
+    PlaylistMixMode.SLAM -> Icons.Rounded.Bolt
+}
+
+/** Horizontal chip row: one tap to switch transition, Spotify-filter style. */
+@Composable
+private fun MixPresetChipsRow(
+    selected: PlaylistMixMode,
+    onSelect: (PlaylistMixMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PlaylistMixMode.values().forEach { mode ->
+            val isSelected = mode == selected
+            Surface(
+                onClick = { onSelect(mode) },
+                color = if (isSelected) SpotifyGreen else SurfaceCard,
+                shape = RoundedCornerShape(50),
+                border = BorderStroke(
+                    1.dp,
+                    if (isSelected) SpotifyGreen else Color.White.copy(alpha = 0.10f),
+                ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = mixModeIcon(mode),
+                        contentDescription = null,
+                        tint = if (isSelected) NaviifyBlack else TextSecondary,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Text(
+                        text = mode.title,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isSelected) NaviifyBlack else TextPrimary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Apercu de l'enveloppe reelle du mode choisi : gain sortant (pointille) et gain
+ * entrant (plein, couleur d'accent) sur la fenetre de recouvrement. Les valeurs
+ * viennent de [mixGains], la meme fonction que celle utilisee pour l'audio.
+ */
+@Composable
+private fun MixCurvePreview(
+    mode: PlaylistMixMode,
+    equalPower: Boolean,
+    durationSeconds: Float,
+    modifier: Modifier = Modifier,
+) {
+    val outgoingColor = TextSecondary.copy(alpha = 0.70f)
+    Surface(
+        color = SurfaceCard,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "TRANSITION CURVE",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        letterSpacing = 1.2.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = TextSecondary,
+                    modifier = Modifier.weight(1f),
+                )
+                Surface(
+                    color = SpotifyGreen.copy(alpha = 0.18f),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(
+                        text = String.format(java.util.Locale.US, "%.1fs", durationSeconds),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = SpotifyGreen,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.28f)),
+            ) {
+                val w = size.width
+                val h = size.height
+
+                for (i in 1 until 8) {
+                    val x = w * i / 8f
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.06f),
+                        start = Offset(x, 0f),
+                        end = Offset(x, h),
+                        strokeWidth = 1f,
+                    )
+                }
+                drawLine(
+                    color = Color.White.copy(alpha = 0.10f),
+                    start = Offset(0f, h / 2f),
+                    end = Offset(w, h / 2f),
+                    strokeWidth = 1f,
+                )
+
+                val steps = 48
+                val outgoing = Path()
+                val incoming = Path()
+                for (i in 0..steps) {
+                    val p = i.toFloat() / steps
+                    val gains = mixGains(p, mode, equalPower)
+                    val x = w * p
+                    val yOut = h * (1f - gains.first)
+                    val yIn = h * (1f - gains.second)
+                    if (i == 0) {
+                        outgoing.moveTo(x, yOut)
+                        incoming.moveTo(x, yIn)
+                    } else {
+                        outgoing.lineTo(x, yOut)
+                        incoming.lineTo(x, yIn)
+                    }
+                }
+
+                drawPath(
+                    path = outgoing,
+                    color = outgoingColor,
+                    style = Stroke(
+                        width = 2.5f,
+                        cap = StrokeCap.Round,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f), 0f),
+                    ),
+                )
+                drawPath(
+                    path = incoming,
+                    color = SpotifyGreen,
+                    style = Stroke(width = 2.5f, cap = StrokeCap.Round),
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 14.dp, height = 3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(SpotifyGreen),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("Incoming", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                Spacer(Modifier.width(14.dp))
+                Box(
+                    modifier = Modifier
+                        .size(width = 14.dp, height = 3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(outgoingColor),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("Outgoing", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+            }
         }
     }
 }

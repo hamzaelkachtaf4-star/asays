@@ -69,6 +69,44 @@ data class PlaylistMixConfig(
     }
 }
 
+/**
+ * Gains (sortant, entrant) de la transition a la position [progress] (0..1).
+ *
+ * Source unique de verite : consomme a la fois par PlaybackController (le gain
+ * reellement applique a l'audio) et par l'apercu de courbe affiche dans l'UI,
+ * pour que le dessin ne puisse jamais mentir sur ce qui est joue.
+ */
+fun mixGains(
+    progress: Float,
+    mode: PlaylistMixMode,
+    equalPower: Boolean,
+): Pair<Float, Float> {
+    val p = progress.coerceIn(0f, 1f)
+    return when (mode) {
+        PlaylistMixMode.AUTO, PlaylistMixMode.FADE ->
+            if (equalPower) {
+                Pair(
+                    kotlin.math.cos(p * Math.PI / 2.0).toFloat(),
+                    kotlin.math.sin(p * Math.PI / 2.0).toFloat(),
+                )
+            } else {
+                Pair(1f - p, p)
+            }
+
+        PlaylistMixMode.RISE -> Pair(
+            if (p < 0.75f) 1f else ((1f - p) / 0.25f),
+            (p * p).coerceIn(0f, 1f),
+        )
+
+        PlaylistMixMode.MELT -> Pair(
+            (1f - p) * (1f - p),
+            kotlin.math.sqrt(p.toDouble()).toFloat(),
+        )
+
+        PlaylistMixMode.SLAM -> Pair(0f, 1f)
+    }
+}
+
 data class CamelotKey(
     val code: String,
     val colorHex: Long,
