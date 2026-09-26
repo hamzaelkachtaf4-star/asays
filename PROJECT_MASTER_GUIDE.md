@@ -336,6 +336,21 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 
 ---
 
+### 42. Lyrics: real sync restored + no more black fade (2026-09-26)
+- `SyncedLyricsList`: the auto-scroll was mistaken for a user drag — `animateScrollToItem` sets `isScrollInProgress`, the old guard flipped `userScrolledRecently = true`, the sync was suppressed for 1.8s and then re-fired: the lyrics stopped following the track and animations piled up. An `isAutoScrolling` flag is now set around the programmatic scroll, so only a real gesture pauses the sync (2.2s).
+- Far lines sat at alpha 0.26: that is the "black fade" that appeared a moment after browsing stopped. Floor raised to 0.50 (0.74 / 0.62 / 0.50).
+- The 6dp blurred halo behind the active line is gone: heaviest per-frame cost, and it left a grey smudge on dark backgrounds.
+- Top/bottom `BlendMode.DstIn` gradient mask: a line straddling the edge fades out instead of being sliced in half (fullscreen and collapsed card).
+- The collapsed card is the same list as fullscreen: it scrolls, and it re-syncs by itself after the user stops.
+
+### 43. Manual transition timing (in/out points) + Spotify-style blend indicator
+- `PlaylistMixConfig.outroOffsetMs` (<= 0: how early the outgoing starts leaving) and `introSkipMs` (>= 0: how much of the incoming's intro is skipped), persisted as longs in `PlaylistMixStore`. `transitionStartMs(durationMs, overlapMs)` lives in the domain and is the single source of truth for both `PlaybackController` and the UI schema (`MixTimingBar`).
+- The intro skip is applied in `onMediaItemTransition` (the item must be loaded first): `pendingIntroSkipMs` is armed when the transition fires and consumed exactly once.
+- `PlaylistTransitionBridgeSheet` gained a "Manual timing" card: Reset + two sliders ("Outgoing exit", "Incoming entry") + a weight-based schematic of the placement (no invented waveform).
+- `AutomixBlendPill` replaced: green text on a green border with a hard "from Waiting Around T..." truncation -> full-width card, accent equalizer bars, white "BLENDING n%", marquee title, and a real progress rail fed by the audio blend progress.
+
+---
+
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
 
 1. **Static Salt for Coil Caching**:
