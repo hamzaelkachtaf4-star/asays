@@ -112,27 +112,8 @@ fun HomeScreen(
 
     var isQuickAccessGridView by rememberSaveable { mutableStateOf(true) }
 
-    val heroItem = remember(state.quickGridItems, state.userPlaylists, state.recentlyAdded) {
-        state.quickGridItems.firstOrNull()
-            ?: state.userPlaylists.firstOrNull()?.let { pl ->
-                QuickGridItem(
-                    id = pl.id,
-                    title = pl.name,
-                    coverArtId = pl.coverArtId,
-                    playlistId = pl.id,
-                    isPlaylist = true,
-                )
-            }
-            ?: state.recentlyAdded.firstOrNull()?.let { alb ->
-                QuickGridItem(
-                    id = alb.id,
-                    title = alb.name,
-                    coverArtId = alb.coverArtId,
-                    albumId = alb.id,
-                    isPlaylist = false,
-                )
-            }
-    }
+    // (Le "hero" / FEATURED PLAYLIST a ete supprime : il repetait un titre deja
+    // present dans la grille "Quick Access". A sa place : les stations radio.)
 
     val userPlaylistsRowState = rememberLazyListState()
     val recentlyAddedRowState = rememberLazyListState()
@@ -280,32 +261,29 @@ fun HomeScreen(
                 }
             }
 
-            // BitChord / Apple Music Style Hero Highlight Card
-            heroItem?.let { hero ->
-                item(key = "home_hero_highlight") {
-                    val heroCover = remember(hero.id, hero.coverArtId, hero.playlistId, hero.isPlaylist) {
-                        if (hero.isPlaylist && hero.playlistId != null) {
-                            com.naviify.app.core.image.CoverUrls.playlistUrl(hero.playlistId, hero.coverArtId, 512)
-                        } else {
-                            com.naviify.app.core.image.CoverUrls.url(hero.coverArtId, 512)
+            // Stations "radio" du jour : cartes facon Spotify, contenu renouvele
+            // chaque jour par le serveur (~/scripts/radio_stations.py).
+            if (radioStations.isNotEmpty()) {
+                item(key = "header_radio") {
+                    SectionHeader("Radio du jour")
+                }
+                item(key = "carousel_radio") {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(radioStations, key = { it.name }, contentType = { "radio_card" }) { station ->
+                            RadioStationCard(
+                                name = station.name,
+                                accent = station.accent,
+                                trackCount = station.size,
+                                onClick = {
+                                    viewModel.playStation(station)
+                                    onOpenNowPlaying()
+                                },
+                            )
                         }
                     }
-                    AppleMusicHeroCard(
-                        title = hero.title,
-                        subtitle = if (hero.isPlaylist) "Playlist • Curated for You" else "Album • Listen Now",
-                        coverUrl = heroCover,
-                        tag = if (hero.isPlaylist) "Featured Playlist" else "Featured Album",
-                        onClick = {
-                            if (hero.isPlaylist && hero.playlistId != null) {
-                                onOpenPlaylist(hero.playlistId)
-                            } else if (hero.albumId != null) {
-                                onOpenAlbum(hero.albumId)
-                            }
-                        },
-                        onPlay = { viewModel.playQuickGridItem(hero) },
-                        modifier = Modifier
-                            .padding(horizontal = 4.dp, vertical = 6.dp),
-                    )
                 }
             }
 
@@ -514,32 +492,6 @@ fun HomeScreen(
                                 playlist = playlist,
                                 onClick = { onOpenPlaylist(playlist.id) },
                                 modifier = Modifier.width(150.dp),
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Stations "radio" du jour : cartes facon Spotify, contenu renouvele
-            // chaque jour par le serveur (~/scripts/radio_stations.py).
-            if (radioStations.isNotEmpty()) {
-                item(key = "header_radio") {
-                    SectionHeader("Radio du jour")
-                }
-                item(key = "carousel_radio") {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(radioStations, key = { it.name }, contentType = { "radio_card" }) { station ->
-                            RadioStationCard(
-                                name = station.name,
-                                accent = station.accent,
-                                trackCount = station.size,
-                                onClick = {
-                                    viewModel.playStation(station)
-                                    onOpenNowPlaying()
-                                },
                             )
                         }
                     }
