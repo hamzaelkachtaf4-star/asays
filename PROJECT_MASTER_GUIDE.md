@@ -384,6 +384,11 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - Reste a faire cote app : section "Radio" sur l'accueil (cartes facon Spotify) + ecran de station + lecture.
 - Perf associee (commit `bcb918e`) : le fond flou du lecteur est calcule sur un calque de 128dp agrandi 6x au lieu d'un `blur(60.dp)` plein ecran, et les paroles de la carte ne composent qu'une fenetre de 14 lignes (composer 100+ lignes creait ~200 animations a l'ouverture).
 
+### 48. Audit statique Kotlin (pas de compilateur sur le serveur)
+- Outil : `python3 ~/scripts/kotlin_audit.py [racine]` - 7 verifications sur les ~110 fichiers `.kt` : equilibre accolades/parentheses/crochets, imports internes `com.naviify.app.*` sans declaration, declarations dupliquees dans un package, getters `@Composable` du theme utilises dans un lambda non-composable (`graphicsLayer`/`drawBehind`/`drawWithContent`/`Canvas`/`remember`/`LaunchedEffect`/`pointerInput`), `R.string`/`R.drawable` inexistants, APIs Material3 experimentales sans `@OptIn`, et cycle de vie (declare/appele) des fonctions sensibles (hash BPM, mix, lyrics).
+- Resultat du 26/09 : **aucun probleme bloquant** ; les 24 signalements sont des faux positifs connus : `BuildConfig`/`R` (generes par Gradle), `FilterChip` (stable dans la Material3 courante), fonctions membres de classes (le parseur ne voit que le top-level), et des chaines brutes multi-lignes qui faussent le comptage de parentheses dans des fichiers qui compilent (ServerUrl.kt). Aucun des fichiers modifies recemment (NowPlayingScreen, PlaylistActionSheets, PlaylistDetail*, HomeScreen, PlaylistMix*, DjMetadata*) n'est signale.
+- Limite : pas de type-checking reel (pas de JDK/Gradle ici) - le verdict final reste `./gradlew assemblePerf` sur le Mac.
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
