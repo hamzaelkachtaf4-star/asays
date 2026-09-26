@@ -312,6 +312,15 @@ Below is the chronological log of all 27 major milestones implemented, tested, a
 - **Files touched**: `app/build.gradle.kts`, `HomeViewModel.kt`, `HomeScreen.kt`, `MediaComponents.kt`.
 - **Not compiled on the server** (no JDK/Gradle/Android SDK there) — run `./gradlew assemblePerf` on the Mac. Expected result to validate: the same scrolling on `app-perf.apk` should be visibly smoother than on `app-debug.apk`.
 
+### 40. Mix / Transition Sheets: Real Curve Preview + Preset Chips
+- **Transition curves now have a single source of truth**: `mixGains(progress, mode, equalPower)` in `domain/model/PlaylistMix.kt` (AUTO/FADE = cos/sin equal-power or linear, RISE = hold at 1 until 75 % then drop with `p²`, MELT = `(1−p)²` out with `√p` in, SLAM = hard cut). `PlaybackController.calculateMixGains()` delegates to it, so the UI preview can never drift from the audio that is played.
+- **`MixCurvePreview`** (private, `PlaylistActionSheets.kt`): a Canvas in an 80 dp box — beat grid, dashed outgoing gain, accent-coloured solid incoming gain, duration pill and legend. Used by both `PlaylistMixStudioSheet` and `PlaylistTransitionBridgeSheet`. It deliberately draws **no waveform**: the app has no audio analysis, so a waveform would be fabricated.
+- **`MixPresetChipsRow`** replaces the 5 stacked mode cards in the per-transition sheet: pill chips (icon + title) filled with `SpotifyGreen` (= active theme accent) when selected, then a single detail card for the selected mode (title + DEFAULT/CUSTOMIZED badge + subtitle). Much shorter sheet, Save always reachable.
+- **`mixModeIcon(mode)`** is now the single icon mapping for a transition mode (it was duplicated in both sheets).
+- **Sheet parameters**: `PlaylistTransitionBridgeSheet` gained defaulted `equalPowerVolume` / `durationSeconds`; `PlaylistDetailScreen` passes the `state.mixConfig` values.
+- **WARNING — the "DJ metadata" in these sheets is fabricated**: `getDjBpm()` returns `84 + (hash % 45)` and `getCamelotKey()` derives the key from a hash of id/artist, so every displayed BPM, Camelot key, "−21 bpm" delta and the "Harmonic Warmth (−1)" banner are invented, not measured. Real values need either BPM/key tags in the files (Navidrome can expose them) or an offline analysis pass. Never build beatmatching/tempo sync on top of these numbers.
+- **Not compiled on the server** — run `./gradlew assemblePerf` on the Mac.
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
