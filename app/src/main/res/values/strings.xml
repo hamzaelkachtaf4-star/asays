@@ -27,10 +27,13 @@
     <string name="home_featured_artists">Featured Artists</string>
 
     <!-- Widgets -->
-    <string name="widget_bar_name">Now Playing (Bar)</string>
-    <string name="widget_bar_description">Spotify-style compact playback bar with controls and track info.</string>
-    <string name="widget_card_name">Now Playing (Card)</string>
-    <string name="widget_card_description">Spotify-style large album art widget with playback controls.</string>
+    <string name="widget_bar_name">ASAYS 4x1</string>
+    <string name="widget_bar_description">Barre compacte : pochette, titre/artiste et controles.</string>
+    <string name="widget_card_name">ASAYS 2x2</string>
+    <string name="widget_card_description">Tuile pochette + lecture, un tap ouvre l\'app.</string>
+    <string name="widget_wide_name">ASAYS 4x2</string>
+    <string name="widget_wide_description">Pochette, controles et acces rapide a votre app.</string>
+    <string name="widget_open_app">Ouvrir ASAYS</string>
     <string name="widget_ready_to_play">Tap to listen to music</string>
     <string name="widget_action_play">Play</string>
     <string name="widget_action_pause">Pause</string>

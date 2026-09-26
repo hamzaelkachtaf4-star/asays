@@ -417,6 +417,16 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - Cout connu et **assume** : le rayon de flou des lignes de paroles inactives reste anime (300 ms, uniquement si l'effet de flou est active dans les reglages) - c'est un effet demande par Tayeb ; le supprimer = appliquer `targetBlur` sans passer par `animateFloatAsState`.
 - Verification : `python3 ~/scripts/kotlin_audit.py` = 0 signalement ; `grep -rn -E '\.(height|width|fillMaxWidth|offset|size)\(.*(animated|wave[0-9]?|offsetFraction)'` ne renvoie plus rien.
 
+### 53. Widgets de lecture : trois tailles, fond degrade, acces rapide (style Spotify)
+- Trois widgets declares (manifest + `res/xml/*_info.xml`) : **ASAYS 4x1** (barre compacte, `NowPlayingBarWidgetProvider`), **ASAYS 2x2** (tuile pochette, `NowPlayingCardWidgetProvider`) et **ASAYS 4x2** (lecteur + ligne d'acces rapide, `NowPlayingWideWidgetProvider`, nouveau).
+- **Fond facon Spotify** : `WidgetBitmapUtils.dominantColor()` (moyenne 8x8, saturation/valeur retravaillees pour rester lisibles sur du texte blanc) + `createGradientBackground()` (degrade vertical, coins arrondis). Le 4x1 et le 4x2 s'en servent ; la tuile 2x2 = pochette plein cadre + bandeau bas (`widget_scrim_strip.xml`, coins bas arrondis au rayon de la pochette).
+- **Controles** : plus de bouton favori dans les widgets (comme Spotify) - `ACTION_FAVORITE` reste gere par `PlayerWidgetReceiver` si on le remet un jour. Bouton lecture = cercle blanc + glyphe sombre (`widget_play_btn_white.xml`) ; precedent/suivant = glyphes clairs sur ripple rond.
+- **Acces rapide (4x2)** : 5 tuiles = les pochettes suivantes de la file (`PlayerUiState.queue` apres `currentIndex`, puis les deja jouees). Chaque tuile, comme toute la surface du widget, ouvre l'app d'un tap.
+- **Taille des bitmaps volontairement modeste** (pochette 112/176/288 px, fonds 420x108 et 420x210, tuiles 96 px) : une RemotesViews trop lourde fait echouer la mise a jour (transaction Binder ~1 Mo). La pochette part donc dans une mise a jour partielle separee du fond et des tuiles.
+- Les coins sont arrondis dans le fond lui-meme (l'OS rogne en plus selon le lanceur).
+- Non compile sur le serveur (pas de JDK/Gradle) : verdict sur Mac avec `./gradlew assemblePerf && ./gradlew testDebugUnitTest`.
+
+
 
 ---
 

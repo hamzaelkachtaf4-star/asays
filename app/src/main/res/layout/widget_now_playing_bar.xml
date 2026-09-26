@@ -1,41 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  Barre compacte 4x1, facon Spotify : fond degrade (couleur de la pochette,
+  genere par PlayerWidgetUpdater), pochette ronde a gauche, titre/artiste, et
+  3 controles seulement (precedent / lecture / suivant).
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/widget_bg_bar"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:baselineAligned="false"
-    android:paddingStart="12dp"
-    android:paddingEnd="12dp"
-    android:paddingTop="6dp"
-    android:paddingBottom="6dp">
+    android:layout_height="match_parent">
 
-    <!-- Open App Click Target (Cover + Texts) -->
-    <LinearLayout
-        android:id="@+id/widget_open_app_area"
-        android:layout_width="0dp"
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:scaleType="fitXY"
+        android:contentDescription="@null" />
 
-        <!-- Album Cover -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:baselineAligned="false"
+        android:paddingStart="10dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp">
+
         <ImageView
             android:id="@+id/widget_album_art"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:scaleType="centerCrop"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:scaleType="fitXY"
             android:src="@drawable/app_logo"
             android:contentDescription="@string/widget_artwork" />
 
-        <!-- Track Info -->
         <LinearLayout
+            android:id="@+id/widget_open_app_area"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="10dp"
             android:layout_marginEnd="6dp"
             android:orientation="vertical">
 
@@ -55,68 +60,45 @@
                 android:id="@+id/widget_artist"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="1dp"
                 android:text="@string/widget_ready_to_play"
-                android:textColor="#B3B3B3"
+                android:textColor="#D9FFFFFF"
                 android:textSize="12sp"
                 android:maxLines="1"
                 android:singleLine="true"
                 android:ellipsize="end" />
         </LinearLayout>
-    </LinearLayout>
 
-    <!-- Controls Row -->
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <!-- Favorite Button -->
-        <ImageButton
-            android:id="@+id/widget_btn_favorite"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:background="@drawable/widget_btn_ripple"
-            android:src="@drawable/ic_widget_heart"
-            android:scaleType="centerInside"
-            android:padding="5dp"
-            android:contentDescription="@string/widget_action_favorite" />
-
-        <!-- Prev Button -->
         <ImageButton
             android:id="@+id/widget_btn_prev"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:layout_marginStart="2dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:background="@drawable/widget_btn_ripple"
             android:src="@drawable/ic_widget_skip_previous"
             android:scaleType="centerInside"
-            android:padding="5dp"
+            android:padding="6dp"
             android:contentDescription="@string/widget_action_previous" />
 
-        <!-- Play/Pause Button (Spotify Green Circle) -->
         <ImageButton
             android:id="@+id/widget_btn_play_pause"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/widget_play_btn_bg"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/widget_play_btn_white"
             android:src="@drawable/ic_widget_play"
             android:scaleType="centerInside"
-            android:padding="9dp"
+            android:padding="11dp"
             android:contentDescription="@string/widget_action_play" />
 
-        <!-- Next Button -->
         <ImageButton
             android:id="@+id/widget_btn_next"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:background="@drawable/widget_btn_ripple"
             android:src="@drawable/ic_widget_skip_next"
             android:scaleType="centerInside"
-            android:padding="5dp"
+            android:padding="6dp"
             android:contentDescription="@string/widget_action_next" />
     </LinearLayout>
-</LinearLayout>
+</FrameLayout>
