@@ -1001,7 +1001,7 @@ private fun InstrumentalGapDots(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.padding(vertical = 8.dp, horizontal = 4.dp),
     ) {
-        for (i in 0 until 3) {
+        repeat(3) {
             Box(
                 modifier = Modifier
                     .size(5.dp)
@@ -1254,7 +1254,7 @@ private fun LyricsFullScreenView(
                         color = TextSecondary,
                     )
                 }
-                if (lyrics.any { it.startMs != null } && offsetMs != 0L) {
+                if (offsetMs != 0L) {
                     Text(
                         text = if (offsetMs > 0) "+%.1fs".format(offsetMs / 1000.0) else "%.1fs".format(offsetMs / 1000.0),
                         style = MaterialTheme.typography.labelSmall,

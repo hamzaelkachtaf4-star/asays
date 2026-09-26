@@ -292,6 +292,18 @@ Below is the chronological log of all 27 major milestones implemented, tested, a
 
 ---
 
+### 38. Lyrics Experience Modernization (Apple-Style Animation, 3-Dots Options & Blur Toggle)
+- **No more accidental seeks**: In the collapsed `LyricsCard`, tapping the card or any lyric line now triggers `onExpand()` (opens fullscreen lyrics) instead of `onSeekTo()`. Click-to-seek is enabled **only** when `isFullScreen == true` and the line has a timestamp (`AppleMusicLyricLineItem`).
+- **Flicker-free rendering**: The animated `Modifier.blur(animatedBlur)` pipeline — the cause of GPU shader flicker and disappearing text on some devices — is gone. Only the active line keeps a single **static** 6dp halo, and only while the glow toggle is ON.
+- **Glow / Blur toggle (persisted)**: New `isLyricsBlurEnabled` in `LyricsPreferencesStore` (key `lyrics_blur_enabled`, default `true`), exposed via `PlayerViewModel.lyricsBlurEnabled` / `setLyricsBlurEnabled()`. OFF = crisp mode: 0dp blur, high-contrast opacity (`1.0f` active vs `0.32f` inactive) for buttery 60/120fps scrolling.
+- **GPU-only active-line animation**: `fontSize` is now **constant** for every line (no recomposition relayout). Emphasis uses `Modifier.graphicsLayer { scaleX/scaleY, transformOrigin = TransformOrigin(0f, 0.5f) }` with `animateFloatAsState` — `spring(DampingRatioLowBouncy, StiffnessLow)` for scale (`1.05f` active / `0.98f` adjacent / `0.95f` far) and `tween(350ms, FastOutSlowInEasing)` for alpha.
+- **Quieter instrumental dots**: `InstrumentalGapDots` threshold raised from 5s to **15s** (long interludes only), and the pulse is now one slow 1200ms alpha animation on 5dp dots instead of 3 staggered alpha+scale animations on 9dp dots.
+- **Decluttered headers + 3-dots consolidation**: `Tune` and `Share` icon buttons removed from both the collapsed card header and the fullscreen header (now title + expand + `MoreVert` only). Their actions live in `LyricsOptionsSheet`: **Share Lyrics** (new entry), **Adjust Timing**, **Search / Replace Lyrics**, plus a **Lyrics Glow Effect** `Switch`. The fullscreen header keeps a compact `+0.5s` offset badge when a timing offset is active.
+- **Files touched**: `NowPlayingScreen.kt`, `LyricsActionSheets.kt`, `LyricsPreferencesStore.kt`, `PlayerViewModel.kt`.
+- **Verification note**: Static review only on the server (no JDK/Gradle/Android SDK there). `./gradlew testDebugUnitTest` and `assembleDebug` must be run on the Mac before shipping.
+
+---
+
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
 
 1. **Static Salt for Coil Caching**:
