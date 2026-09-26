@@ -914,9 +914,18 @@ private fun AutomixBlendPill(
                 verticalAlignment = Alignment.Bottom,
                 modifier = Modifier.height(12.dp),
             ) {
-                Box(Modifier.width(2.5.dp).height((12 * wave1).dp).background(accent, CircleShape))
-                Box(Modifier.width(2.5.dp).height((12 * wave2).dp).background(accent, CircleShape))
-                Box(Modifier.width(2.5.dp).height((12 * wave3).dp).background(accent, CircleShape))
+                // Hauteur fixe + scaleY lu en phase de dessin : `height((12 * wave).dp)`
+                // relisait l'etat anime dans la composition, donc toute la pill
+                // recomposait a chaque frame pendant la transition.
+                Box(Modifier.width(2.5.dp).height(12.dp)
+                    .graphicsLayer { scaleY = wave1; transformOrigin = TransformOrigin(0.5f, 1f) }
+                    .background(accent, CircleShape))
+                Box(Modifier.width(2.5.dp).height(12.dp)
+                    .graphicsLayer { scaleY = wave2; transformOrigin = TransformOrigin(0.5f, 1f) }
+                    .background(accent, CircleShape))
+                Box(Modifier.width(2.5.dp).height(12.dp)
+                    .graphicsLayer { scaleY = wave3; transformOrigin = TransformOrigin(0.5f, 1f) }
+                    .background(accent, CircleShape))
             }
             Text(
                 text = "BLENDING ${(progress * 100).toInt().coerceIn(0, 100)}%",
@@ -949,23 +958,39 @@ private fun AutomixBlendPill(
             }
             }
             // Rail de progression du blend : la vraie progression audio, pas une
-            // animation decorative.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .clip(CircleShape)
-                    .background(trackColor),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(smoothProgress.coerceIn(0f, 1f))
-                        .height(3.dp)
-                        .clip(CircleShape)
-                        .background(accent),
-                )
-            }
+            // animation decorative. La valeur est lue dans le composable dedie
+            // (lambda differee) : lue ici, elle recomposait la pill entiere a
+            // chaque frame pendant toute la duree de la transition.
+            BlendProgressRail({ smoothProgress }, trackColor, accent)
         }
+    }
+}
+
+/**
+ * Rail de progression du blend. `progress` est une lambda pour deferer la lecture
+ * de l'etat anime : seule cette petite barre se recompose au rythme de
+ * l'animation, pas la pill complete (en-tete, marquee, bordure).
+ */
+@Composable
+private fun BlendProgressRail(
+    progress: () -> Float,
+    trackColor: Color,
+    accent: Color,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(3.dp)
+            .clip(CircleShape)
+            .background(trackColor),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progress().coerceIn(0f, 1f))
+                .height(3.dp)
+                .clip(CircleShape)
+                .background(accent),
+        )
     }
 }
 
@@ -1095,7 +1120,10 @@ private fun InstrumentalGapDots(
                 modifier = Modifier
                     .size(5.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = animAlpha)),
+                    // alpha en phase de dessin : `background(copy(alpha = animAlpha))`
+                    // relisait l'etat anime dans la composition a chaque frame.
+                    .graphicsLayer { alpha = animAlpha }
+                    .background(Color.White),
             )
         }
     }

@@ -101,8 +101,10 @@ fun MarqueeText(
             label = "marquee_offset",
         )
 
-        val offsetPx = offsetFraction * segmentWidthPx
-
+        // L'etat anime est lu DANS le lambda graphicsLayer : la phase de dessin
+        // invalide la couche au lieu de la composition. Avant, `offsetPx` etait
+        // calcule dans le corps du composable, donc le marquee recomposait a
+        // chaque frame (et il est affiche dans la pill de blend, le mini-player...).
         Box(
             modifier = modifier
                 .fillMaxWidth()
@@ -117,7 +119,9 @@ fun MarqueeText(
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Visible,
-                modifier = Modifier.graphicsLayer { translationX = -offsetPx },
+                modifier = Modifier.graphicsLayer {
+                    translationX = -(offsetFraction * segmentWidthPx)
+                },
             )
         }
     }
