@@ -360,7 +360,9 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 ### 45. Accueil allege + playlists de genre automatiques
 - Accueil : la section "Quick Picks" (12 albums sur deux colonnes) est **retiree** de `HomeScreen`. Le fetch reste dans `HomeViewModel` parce que `quickPicks` sert aussi a la detection hors-ligne, mais plus rien n'est dessine : moins de travail sur le fil d'accueil.
 - Serveur : la bibliotheque n'a **aucun tag de genre** (1487/1487 lignes vides dans `media_file`), donc `~/scripts/genre_playlists.py` classe par **artiste** (dictionnaire curate + filet "Cheb/Cheba" -> rai) et ecrit des `.m3u8` dans `/srv/media/music/Playlists`.
-- Resultat mesure : Rap Maghribi 43 titres (ElGrandeToto 20, Lbenj, Morad, Draganov, Shobee + collabs), Raï (auto) 483, Rap US 470, Rock 24, Country 12 ; 1033/1487 morceaux classes (69%).
+- Resultat mesure (26/09, apres retours de Tayeb sur les artistes) : Rap Maghribi 68 titres (ElGrandeToto 20, Raid 14, Mehdi Black Wind 7, Lbenj, Morad, Mr. Crazy + collabs), Raï (auto) 494, Rap US 479, Rap Russe 16 (Gio Pika + Вектор А), Rock 24, Country 24 ; 1106/1487 morceaux classes (74%).
+- Buckets = dictionnaire curate par artiste + filet "Cheb/Cheba/Cheikh" -> raï. Gio Pika (Гио Пика) est classe **rap/chanson russe**, pas marocain (confirme par Tayeb).
+- Nettoyage : un `.m3u8` portant le marqueur mais plus produit est supprime automatiquement (renommage de bucket, playlist passee sous le seuil).
 - Garde-fou : un `.m3u8` sans le marqueur `AUTO-GENERATED` n'est jamais ecrase (le "Raï" manuel de 746 titres est intact) ; on ecrit alors `<Nom> (auto).m3u8`.
 - Refresh : timer systemd user `genre-playlists.timer` (quotidien). Manuel : `python3 ~/scripts/genre_playlists.py`.
 - Cote app : rien a faire, Navidrome expose ces playlists comme les autres (verifie en base : les 5 presentes avec leurs comptes de titres).
