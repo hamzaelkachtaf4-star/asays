@@ -1,0 +1,22 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "type": "navidrome",
+    "serverVersion": "0.52.5",
+    "openSubsonic": true,
+    "playlists": {
+      "playlist": [
+        {
+          "id": "pl1",
+          "name": "Morning Run",
+          "comment": "Upbeat",
+          "owner": "user",
+          "public": true,
+          "songCount": 24,
+          "duration": 5402
+        }
+      ]
+    }
+  }
+}

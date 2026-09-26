@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Self-hosted Navidrome servers are commonly reached over plain HTTP on a LAN or
+  Tailscale address, so cleartext stays permitted for the user's own hosts.
+
+  User-installed CAs are honoured in debuggable builds only. Trusting them in a
+  release build would let any device-local proxy read the Subsonic token, salt
+  and stream URLs, and would also apply to third-party traffic such as LRCLIB.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- The public lyrics API must never be downgraded to cleartext. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">lrclib.net</domain>
+    </domain-config>
+
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

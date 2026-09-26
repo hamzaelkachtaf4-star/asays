@@ -1,0 +1,52 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "type": "navidrome",
+    "serverVersion": "0.52.5",
+    "openSubsonic": true,
+    "searchResult3": {
+      "artist": [
+        {
+          "id": "ar1",
+          "name": "Radiohead",
+          "albumCount": 9
+        }
+      ],
+      "album": [
+        {
+          "id": "al1",
+          "name": "OK Computer",
+          "artist": "Radiohead",
+          "artistId": "ar1",
+          "songCount": 12,
+          "duration": 6425,
+          "coverArt": "al-al1"
+        }
+      ],
+      "song": [
+        {
+          "id": "tr1",
+          "parent": "al1",
+          "title": "Paranoid Android",
+          "album": "OK Computer",
+          "artist": "Radiohead",
+          "albumArtist": "Radiohead",
+          "track": 2,
+          "discNumber": 1,
+          "year": 1997,
+          "genre": "Alternative",
+          "coverArt": "al-al1",
+          "size": 12345678,
+          "contentType": "audio/mpeg",
+          "suffix": "mp3",
+          "duration": 383,
+          "bitRate": 320,
+          "path": "Radiohead/OK Computer/02 - Paranoid Android.mp3",
+          "playCount": 4,
+          "starred": false
+        }
+      ]
+    }
+  }
+}

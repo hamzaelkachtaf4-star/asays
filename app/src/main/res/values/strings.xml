@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ASAYS</string>
+
+    <string name="connect_title">ASAYS</string>
+    <string name="connect_subtitle">Your music, self-hosted.</string>
+    <string name="server_url_label">Server URL</string>
+    <string name="server_url_hint">https://music.example.com</string>
+    <string name="username_label">Username</string>
+    <string name="secret_hint">Password or API token</string>
+    <string name="use_token_label">Use API token</string>
+    <string name="connect_button">Connect</string>
+    <string name="checking_connection">Checking connection\u2026</string>
+    <string name="connected_title">Connected</string>
+    <string name="connected_to">Connected to %1$s</string>
+    <string name="disconnect_button">Disconnect</string>
+    <string name="connection_failed">Connection failed</string>
+    <string name="retry_button">Retry</string>
+    <string name="edit_server_button">Edit server</string>
+    <string name="server_info">%1$s · version %2$s</string>
+
+    <string name="home_greeting_morning">Good morning</string>
+    <string name="home_greeting_afternoon">Good afternoon</string>
+    <string name="home_greeting_evening">Good evening</string>
+    <string name="home_quick_picks">Quick Picks</string>
+    <string name="home_recently_added">Recently Added</string>
+    <string name="home_featured_artists">Featured Artists</string>
+
+    <!-- Widgets -->
+    <string name="widget_bar_name">Now Playing (Bar)</string>
+    <string name="widget_bar_description">Spotify-style compact playback bar with controls and track info.</string>
+    <string name="widget_card_name">Now Playing (Card)</string>
+    <string name="widget_card_description">Spotify-style large album art widget with playback controls.</string>
+    <string name="widget_ready_to_play">Tap to listen to music</string>
+    <string name="widget_action_play">Play</string>
+    <string name="widget_action_pause">Pause</string>
+    <string name="widget_action_next">Next</string>
+    <string name="widget_action_previous">Previous</string>
+    <string name="widget_action_favorite">Favorite</string>
+    <string name="widget_artwork">Album Art</string>
+    <string name="widget_default_title">ASAYS</string>
+</resources>

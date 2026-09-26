@@ -1,0 +1,27 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "type": "navidrome",
+    "serverVersion": "0.52.5",
+    "openSubsonic": true,
+    "artists": {
+      "ignoredArticles": "The El La Los Las Le Les",
+      "lastModified": 1700000000000,
+      "index": [
+        {
+          "name": "D",
+          "artist": [
+            {
+              "id": "6f8f9c0a",
+              "name": "Daft Punk",
+              "albumCount": 9,
+              "coverArt": "al-6f8f9c0a",
+              "starred": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

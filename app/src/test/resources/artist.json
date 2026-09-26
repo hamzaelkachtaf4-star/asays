@@ -1,0 +1,38 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "type": "navidrome",
+    "serverVersion": "0.52.5",
+    "openSubsonic": true,
+    "artist": {
+      "id": "ar-1",
+      "name": "Daft Punk",
+      "coverArt": "ar-ar-1",
+      "albumCount": 9,
+      "starred": true,
+      "album": [
+        {
+          "id": "al-1",
+          "name": "Discovery",
+          "artist": "Daft Punk",
+          "artistId": "ar-1",
+          "songCount": 14,
+          "duration": 3678,
+          "year": 2001,
+          "coverArt": "al-al-1",
+          "starred": true
+        },
+        {
+          "id": "al-2",
+          "name": "Homework",
+          "artist": "Daft Punk",
+          "artistId": "ar-1",
+          "songCount": 16,
+          "duration": 4412,
+          "year": 1997
+        }
+      ]
+    }
+  }
+}

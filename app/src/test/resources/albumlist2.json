@@ -1,0 +1,32 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "type": "navidrome",
+    "serverVersion": "0.52.5",
+    "openSubsonic": true,
+    "albumList2": {
+      "album": [
+        {
+          "id": "al-1",
+          "name": "Random Access Memories",
+          "artist": "Daft Punk",
+          "artistId": "ar-1",
+          "songCount": 13,
+          "duration": 4477,
+          "year": 2013,
+          "coverArt": "al-al-1"
+        },
+        {
+          "id": "al-2",
+          "name": "Homework",
+          "artist": "Daft Punk",
+          "artistId": "ar-1",
+          "songCount": 16,
+          "duration": 4412,
+          "year": 1997
+        }
+      ]
+    }
+  }
+}

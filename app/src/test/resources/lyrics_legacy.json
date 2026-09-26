@@ -1,0 +1,15 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "type": "navidrome",
+    "serverVersion": "0.52.5",
+    "openSubsonic": true,
+    "lyrics": {
+      "songId": "tr-1",
+      "artist": "Radiohead",
+      "title": "Airbag",
+      "value": "[00:12.00]In the next world war\n[00:16.00]In a jackknifed juggernaut"
+    }
+  }
+}

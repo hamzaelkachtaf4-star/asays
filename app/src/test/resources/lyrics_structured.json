@@ -1,0 +1,25 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "type": "navidrome",
+    "serverVersion": "0.52.5",
+    "openSubsonic": true,
+    "structuredLyrics": [
+      {
+        "lang": "eng",
+        "synced": true,
+        "line": [
+          {
+            "start": 12000,
+            "value": "First line"
+          },
+          {
+            "start": 24000,
+            "value": "Second line"
+          }
+        ]
+      }
+    ]
+  }
+}
