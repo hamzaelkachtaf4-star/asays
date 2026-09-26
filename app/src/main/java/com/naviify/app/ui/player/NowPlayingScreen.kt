@@ -1051,13 +1051,14 @@ private fun LyricsCard(
                         }
                     }
                 }
-                else -> InPageSyncedLyrics(
+                else -> SyncedLyricsList(
                     positionFlow = positionFlow,
                     lyrics = lyrics,
                     offsetMs = offsetMs,
+                    onSeekTo = onSeekTo,
+                    onExpand = onExpand,
+                    isFullScreen = false,
                     isBlurEnabled = isBlurEnabled,
-                    onOpenFullScreen = onExpand,
-                    cardBg = cardBg,
                 )
             }
         }
@@ -1108,18 +1109,10 @@ private fun AppleMusicLyricLineItem(
     offsetMs: Long,
     onSeekTo: (Long) -> Unit,
     onExpand: () -> Unit,
-    onPositioned: ((Int, Float, Float) -> Unit)? = null,
 ) {
     val isActive = isSynced && index == activeIndex
     val distance = if (activeIndex >= 0) kotlin.math.abs(index - activeIndex) else 0
 
-    // Hierarchie douce : la ligne active reste franche, les autres ne tombent
-    // jamais dans le noir. L'ancien 0.26 pour les lignes lointaines faisait
-    // apparaitre un "degrade noir" des que la lecture sortait du mode browsing.
-    // La ligne active garde TOUJOURS son accentuation : meme quand on fait
-    // defiler le plein ecran (mode "browsing") elle reste franche et animee.
-    // Avant, le mode browsing passait toutes les lignes a 0.82 : en tapant une
-    // ligne pour s'y rendre, l'effet semblait disparaitre.
     val targetAlpha = when {
         !isSynced -> 0.88f
         isActive -> 1.0f
@@ -1193,15 +1186,6 @@ private fun AppleMusicLyricLineItem(
             .clickable(enabled = isFullScreen && line.startMs != null) {
                 line.startMs?.let { onSeekTo((it - offsetMs).coerceAtLeast(0L)) }
             }
-            .then(
-                if (onPositioned != null) {
-                    Modifier.onGloballyPositioned { coords ->
-                        onPositioned(index, coords.positionInParent().y, coords.size.height.toFloat())
-                    }
-                } else {
-                    Modifier
-                }
-            )
             .padding(vertical = if (isFullScreen) 10.dp else 6.dp),
     ) {
         // Glowing ambient halo behind active line when blur effect is enabled
@@ -1233,118 +1217,6 @@ private fun AppleMusicLyricLineItem(
     }
 }
 
-/**
- * Paroles de la carte "en cours de lecture" : Defilement continu fluide et centre.
- *
- * Aligne toujours le defilement sur le vers precedent entier (sans AUCUN vers tronque
- * ni coupe au bord superieur), avec le vers actif juste en-dessous en plein focus.
- */
-@Composable
-private fun InPageSyncedLyrics(
-    positionFlow: Flow<Long>,
-    lyrics: List<LyricsLineData>,
-    offsetMs: Long = 0L,
-    isBlurEnabled: Boolean = true,
-    onOpenFullScreen: () -> Unit,
-    modifier: Modifier = Modifier,
-    cardBg: Color = Color(0xFF242424),
-) {
-    val positionMs by positionFlow.collectAsStateWithLifecycle(initialValue = 0L)
-    val isSynced = remember(lyrics) { lyrics.any { it.startMs != null } }
-    val effectivePos = positionMs + offsetMs
-    val activeIndex = remember(effectivePos, isSynced, lyrics) {
-        if (!isSynced) -1 else lyrics.indexOfLast { it.startMs != null && it.startMs <= effectivePos }
-    }
-
-    val lineTops = remember(lyrics) { mutableStateMapOf<Int, Float>() }
-
-    // Aligne le defilement sur le debut du vers precedent :
-    // Le vers precedent commence a y=0 (entier, jamais coupe en deux)
-    // Le vers actif est juste en-dessous (entier, en vedette avec son halo)
-    val targetY = if (activeIndex <= 0) {
-        0f
-    } else {
-        lineTops[activeIndex - 1] ?: 0f
-    }
-
-    val animatedY by animateFloatAsState(
-        targetValue = targetY,
-        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
-        label = "in_page_lyrics_offset",
-    )
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(270.dp)
-            .clipToBounds()
-            .pointerInput(Unit) { detectTapGestures { onOpenFullScreen() } },
-        contentAlignment = Alignment.TopStart,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer { translationY = -animatedY },
-        ) {
-            lyrics.forEachIndexed { index, line ->
-                AppleMusicLyricLineItem(
-                    line = line,
-                    index = index,
-                    activeIndex = activeIndex,
-                    isSynced = isSynced,
-                    isBrowsing = false,
-                    isFullScreen = false,
-                    isBlurEnabled = isBlurEnabled,
-                    offsetMs = offsetMs,
-                    onSeekTo = {},
-                    onExpand = onOpenFullScreen,
-                    onPositioned = { measuredIndex, top, _ ->
-                        lineTops[measuredIndex] = top
-                    },
-                )
-
-                val nextLine = lyrics.getOrNull(index + 1)
-                val currentMs = line.startMs
-                val nextMs = nextLine?.startMs
-                if (currentMs != null && nextMs != null && (nextMs - currentMs >= 20000L)) {
-                    val isGapActive = isSynced && effectivePos > currentMs + 2000L && effectivePos < nextMs
-                    InstrumentalGapDots(isActive = isGapActive)
-                }
-            }
-        }
-
-        // Fondu superieur discret (uniquement pendant la transition de defilement)
-        val topOverlayAlpha = (animatedY / 24f).coerceIn(0f, 1f)
-        if (topOverlayAlpha > 0.01f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(20.dp)
-                    .align(Alignment.TopCenter)
-                    .alpha(topOverlayAlpha)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(cardBg, Color.Transparent),
-                        ),
-                    ),
-            )
-        }
-
-        // Fondu inferieur tres fin au bord de la carte
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, cardBg),
-                    ),
-                ),
-        )
-    }
-}
-
 @Composable
 private fun SyncedLyricsList(
     positionFlow: Flow<Long>,
@@ -1367,10 +1239,10 @@ private fun SyncedLyricsList(
 
     var userScrolledRecently by remember { mutableStateOf(false) }
     var isAutoScrolling by remember { mutableStateOf(false) }
-    val isBrowsing = listState.isScrollInProgress || userScrolledRecently
+    val isBrowsing = if (isFullScreen) (listState.isScrollInProgress || userScrolledRecently) else false
 
     LaunchedEffect(listState.isScrollInProgress, isAutoScrolling) {
-        if (listState.isScrollInProgress && !isAutoScrolling) {
+        if (isFullScreen && listState.isScrollInProgress && !isAutoScrolling) {
             userScrolledRecently = true
         } else if (!listState.isScrollInProgress && userScrolledRecently) {
             delay(2200L)
@@ -1403,17 +1275,19 @@ private fun SyncedLyricsList(
 
     LazyColumn(
         state = listState,
+        userScrollEnabled = isFullScreen,
         modifier = (if (isFullScreen) modifier else modifier
             .fillMaxWidth()
-            .height(280.dp))
+            .height(260.dp)
+            .clickable { onExpand() })
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
                 drawContent()
                 drawRect(brush = fadeMask, blendMode = BlendMode.DstIn)
             },
         contentPadding = PaddingValues(
-            top = if (isFullScreen) 100.dp else 16.dp,
-            bottom = if (isFullScreen) 220.dp else 16.dp,
+            top = if (isFullScreen) 100.dp else 12.dp,
+            bottom = if (isFullScreen) 220.dp else 40.dp,
         ),
     ) {
         itemsIndexed(lyrics, key = { index, line -> "$index-${line.text}" }) { index, line ->
