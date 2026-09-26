@@ -141,6 +141,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -976,8 +977,9 @@ private fun LyricsCard(
     onOpenOptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val cardBg = Color(0xFF242424)
     Surface(
-        color = Color(0xFF242424),
+        color = cardBg,
         shape = RoundedCornerShape(20.dp),
         modifier = modifier.clickable { onExpand() },
     ) {
@@ -1055,6 +1057,7 @@ private fun LyricsCard(
                     offsetMs = offsetMs,
                     isBlurEnabled = isBlurEnabled,
                     onOpenFullScreen = onExpand,
+                    cardBg = cardBg,
                 )
             }
         }
@@ -1151,21 +1154,33 @@ private fun AppleMusicLyricLineItem(
     val fontSize = if (isFullScreen) 30.sp else 26.sp
     val lineHeight = if (isFullScreen) 38.sp else 34.sp
 
-    val lineBlur = if (isBlurEnabled && !isActive && isSynced) {
+    val targetBlur = if (isBlurEnabled && !isActive && isSynced) {
         if (activeIndex < 0) {
             when (index) {
-                0, 1 -> 0.dp
-                2 -> 1.dp
-                else -> 2.dp
+                0, 1 -> 0f
+                2 -> 1f
+                else -> 2f
             }
         } else if (distance >= 1) {
-            (distance * 1.2f).coerceAtMost(3f).dp
+            (distance * 1.2f).coerceAtMost(2.5f)
         } else {
-            0.dp
+            0f
         }
     } else {
-        0.dp
+        0f
     }
+    val animatedBlur by animateFloatAsState(
+        targetValue = targetBlur,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "lyric_blur_$index",
+    )
+
+    val targetGlowAlpha = if (isActive && isBlurEnabled) 0.40f else 0.0f
+    val animatedGlowAlpha by animateFloatAsState(
+        targetValue = targetGlowAlpha,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "lyric_glow_$index",
+    )
 
     Box(
         modifier = Modifier
@@ -1190,7 +1205,7 @@ private fun AppleMusicLyricLineItem(
             .padding(vertical = if (isFullScreen) 10.dp else 8.dp),
     ) {
         // Glowing ambient halo behind active line when blur effect is enabled
-        if (isActive && isBlurEnabled) {
+        if (animatedGlowAlpha > 0.01f) {
             Text(
                 text = line.text,
                 fontSize = fontSize,
@@ -1200,7 +1215,7 @@ private fun AppleMusicLyricLineItem(
                 textAlign = TextAlign.Start,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer { alpha = 0.40f }
+                    .graphicsLayer { alpha = animatedGlowAlpha }
                     .blur(8.dp, BlurredEdgeTreatment.Unbounded),
             )
         }
@@ -1213,7 +1228,7 @@ private fun AppleMusicLyricLineItem(
             textAlign = TextAlign.Start,
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (lineBlur > 0.dp) Modifier.blur(lineBlur) else Modifier),
+                .then(if (animatedBlur > 0.1f) Modifier.blur(animatedBlur.dp) else Modifier),
         )
     }
 }
@@ -1222,12 +1237,12 @@ private fun AppleMusicLyricLineItem(
  * Paroles de la carte "en cours de lecture" : Defilement continu fluide et centre.
  *
  * Toutes les lignes sont rendues dans une colonne animee par translation GPU
- * (translationY, un seul calque GPU) pour garder la ligne active au centre-haut
- * (~35% du cadre).
+ * (translationY) pour garder la ligne active au focus (~24dp).
  *
  * Avantages :
  *  - Animation parfaitement fluide sans re-layout ni a-coups (glide continu) ;
- *  - Aucune zone vide en bas : toutes les lignes suivantes remplissent la carte ;
+ *  - Fondu directement dans la couleur de la carte (aucun trait disgracieux, aucune coupure) ;
+ *  - Chaque vers actif avance et fait defiler la liste au fil de la chanson ;
  *  - En intro (activeIndex < 0) : les premieres lignes s'affichent proprement des le haut ;
  *  - Aucun geste de defilement interne n'interfere avec la page principale ;
  *  - Un tap n'importe ou ouvre la vue plein ecran.
@@ -1240,6 +1255,7 @@ private fun InPageSyncedLyrics(
     isBlurEnabled: Boolean = true,
     onOpenFullScreen: () -> Unit,
     modifier: Modifier = Modifier,
+    cardBg: Color = Color(0xFF242424),
 ) {
     val positionMs by positionFlow.collectAsStateWithLifecycle(initialValue = 0L)
     val isSynced = remember(lyrics) { lyrics.any { it.startMs != null } }
@@ -1249,57 +1265,33 @@ private fun InPageSyncedLyrics(
     }
 
     val lineTops = remember(lyrics) { mutableStateMapOf<Int, Float>() }
-    val lineHeights = remember(lyrics) { mutableStateMapOf<Int, Float>() }
-    var viewportPx by remember { mutableFloatStateOf(0f) }
-    var columnHeightPx by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val focalOffsetPx = with(density) { 24.dp.toPx() }
 
-    val targetY = remember(activeIndex, lineTops.toMap(), lineHeights.toMap(), viewportPx, columnHeightPx) {
-        if (activeIndex < 0 || viewportPx <= 0f) {
-            0f
-        } else {
-            val top = lineTops[activeIndex] ?: 0f
-            val height = lineHeights[activeIndex] ?: 0f
-            val desired = top + height / 2f - viewportPx * 0.35f
-            val maxScroll = (columnHeightPx - viewportPx + 24f).coerceAtLeast(0f)
-            desired.coerceIn(0f, maxScroll)
-        }
+    val currentTop = lineTops[activeIndex]
+    val targetY = if (activeIndex <= 0 || currentTop == null) {
+        0f
+    } else {
+        (currentTop - focalOffsetPx).coerceAtLeast(0f)
     }
 
     val animatedY by animateFloatAsState(
         targetValue = targetY,
-        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
         label = "in_page_lyrics_offset",
     )
-
-    // Masque de fondu : la ligne du haut s'estompe uniquement une fois que la liste a commence a defiler
-    val topFadeFactor = (animatedY / 40f).coerceIn(0f, 1f)
-    val fadeMask = remember(topFadeFactor) {
-        Brush.verticalGradient(
-            0.0f to Color.Black.copy(alpha = 1f - topFadeFactor),
-            0.12f to Color.Black,
-            0.88f to Color.Black,
-            1.0f to Color.Transparent,
-        )
-    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(260.dp)
+            .height(250.dp)
             .clipToBounds()
-            .onSizeChanged { viewportPx = it.height.toFloat() }
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                drawRect(brush = fadeMask, blendMode = BlendMode.DstIn)
-            }
             .pointerInput(Unit) { detectTapGestures { onOpenFullScreen() } },
         contentAlignment = Alignment.TopStart,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .onSizeChanged { columnHeightPx = it.height.toFloat() }
                 .graphicsLayer { translationY = -animatedY },
         ) {
             lyrics.forEachIndexed { index, line ->
@@ -1314,9 +1306,8 @@ private fun InPageSyncedLyrics(
                     offsetMs = offsetMs,
                     onSeekTo = {},
                     onExpand = onOpenFullScreen,
-                    onPositioned = { measuredIndex, top, height ->
+                    onPositioned = { measuredIndex, top, _ ->
                         lineTops[measuredIndex] = top
-                        lineHeights[measuredIndex] = height
                     },
                 )
 
@@ -1329,6 +1320,36 @@ private fun InPageSyncedLyrics(
                 }
             }
         }
+
+        // Fondu superieur doux dans la couleur de la carte (uniquement apres defilement)
+        val topOverlayAlpha = (animatedY / 30f).coerceIn(0f, 1f)
+        if (topOverlayAlpha > 0.01f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .align(Alignment.TopCenter)
+                    .alpha(topOverlayAlpha)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(cardBg, Color.Transparent),
+                        ),
+                    ),
+            )
+        }
+
+        // Fondu inferieur progressif dans le fond de la carte : AUCUNE ligne ni coupure
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, cardBg),
+                    ),
+                ),
+        )
     }
 }
 
