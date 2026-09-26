@@ -302,6 +302,16 @@ Below is the chronological log of all 27 major milestones implemented, tested, a
 - **Files touched**: `NowPlayingScreen.kt`, `LyricsActionSheets.kt`, `LyricsPreferencesStore.kt`, `PlayerViewModel.kt`.
 - **Verification note**: Static review only on the server (no JDK/Gradle/Android SDK there). `./gradlew testDebugUnitTest` and `assembleDebug` must be run on the Mac before shipping.
 
+### 39. Home Smoothness Diagnosis: Build Variants & Per-Frame Churn
+- **Root cause found: the build type.** `release` had no `signingConfig`, so `assembleRelease` produced an unsigned (non-installable) APK — every build ever tested on the phone was the **debug** build, which is debuggable (ART/R8 optimizations off) and ships Compose `ui-tooling`. Home is the heaviest screen (≈15 images, 4 nested `LazyRow`s, ~40 text nodes), so it is where a debuggable build hurts most.
+- **New `perf` build type (`app/build.gradle.kts`)**: release-like (non-debuggable, no `ui-tooling`) but **without R8** (so it cannot crash on a missing keep rule) and signed with `signingConfigs.localDebug` (Android Studio's debug keystore). It reuses the `debug` application id, so `adb install -r app-perf.apk` upgrades the app in place and keeps the saved server credentials. `release` is now signed with the same keystore so it is installable too.
+- **No more full refetch on every Home visit (`HomeViewModel.kt`)**: `FRESHNESS_MS = 60s` guard in the new `loadInternal(force)`; `load()` short-circuits when `cachedHomeUiState` is still fresh, `refresh()` forces a reload and is wired to the `ErrorBubble` retry. Before, each return to Home fired 5 network calls (including `getArtists()`, which returns all 628 artists of this library to display 12) and rebuilt the whole screen and all its images.
+- **Downloads flow off the UI thread**: `.flowOn(Dispatchers.Default)` on the `observeDownloads()` chain — the `filter`/`map`/`sorted`/`distinctUntilChanged` ran on `Dispatchers.Main` on every progress tick.
+- **No per-composition allocation / no image crossfade on Home (`HomeScreen.kt`)**: the hero and quick-access thumbnail `ImageRequest`s are `remember`ed and no longer set `crossfade(true)` (that contradicted the global `crossfade(false)` policy and animated one fade per image while scrolling); the hero placeholder/scrim gradients are `remember`ed.
+- **`PlaylistCoverArt` zero-allocation (`MediaComponents.kt`)**: the gradient `Brush` and the `drawBehind` pattern modifier are `remember`ed instead of rebuilt on every composition of every playlist tile.
+- **Files touched**: `app/build.gradle.kts`, `HomeViewModel.kt`, `HomeScreen.kt`, `MediaComponents.kt`.
+- **Not compiled on the server** (no JDK/Gradle/Android SDK there) — run `./gradlew assemblePerf` on the Mac. Expected result to validate: the same scrolling on `app-perf.apk` should be visibly smoother than on `app-debug.apk`.
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
@@ -331,14 +341,20 @@ cd /Users/tayeb/Documents/naviify
 # 2. Run all unit tests (94 tests covering queues, repositories, auth, mappers, custom lyrics)
 ./gradlew testDebugUnitTest
 
-# 3. Assemble the debug APK
-./gradlew assembleDebug
+# 3. Assemble the FAST build (use this one, and to judge smoothness)
+./gradlew assemblePerf
 
 # 4. Install directly to a connected USB Android phone
-~/Library/Android/sdk/platform-tools/adb install -r /Users/tayeb/Documents/naviify/app/build/outputs/apk/debug/app-debug.apk
+~/Library/Android/sdk/platform-tools/adb install -r /Users/tayeb/Documents/naviify/app/build/outputs/apk/perf/app-perf.apk
+
+# Debug build: only for step-by-step debugging in Android Studio. It is 2-3x slower on
+# UI-heavy screens (Home) because it is debuggable and ships Compose ui-tooling.
+./gradlew assembleDebug
 ```
 
-- **Built APK Path**: `/Users/tayeb/Documents/naviify/app/build/outputs/apk/debug/app-debug.apk`
+- **Built APK Path (fast, prefer this one)**: `/Users/tayeb/Documents/naviify/app/build/outputs/apk/perf/app-perf.apk`
+- **Built APK Path (debug)**: `/Users/tayeb/Documents/naviify/app/build/outputs/apk/debug/app-debug.apk`
+- **Build Variants**: `debug` (debuggable + ui-tooling, application id `com.naviify.app.debug`), `perf` (non-debuggable, no R8, signed with the debug keystore, **same application id as debug** so installing it upgrades the app in place and keeps the saved server credentials), `release` (R8 + resource shrinking, also signed with the debug keystore so `assembleRelease` is installable — replace that with a real keystore before publishing).
 - **Current Build Status**: `BUILD SUCCESSFUL` (0 errors, 94/94 tests passed).
 
 ---
@@ -364,4 +380,5 @@ If you are an AI assistant reading this guide in a new session:
 - **Project Location**: `/Users/tayeb/Documents/naviify`
 - **User Language**: Moroccan Darija (Arabic dialect) or English. Always respond politely, clearly, and concisely in the user's preferred language. All code and UI text must be in English.
 - **Coding Style**: Idiomatic Kotlin, Jetpack Compose Material 3, clean Architecture with Hilt DI.
-- **Verification Rule**: Always run `./gradlew assembleDebug` and `./gradlew testDebugUnitTest` after modifying code before concluding your task.
+- **Verification Rule**: Always run `./gradlew assemblePerf` and `./gradlew testDebugUnitTest` after modifying code before concluding your task.
+- **Performance Rule**: Never judge UI smoothness on a debug build. Only `perf`/`release` are representative: a debuggable build runs without ART/R8 optimizations and ships Compose ui-tooling, which costs 2-3x on image-heavy screens such as Home.
