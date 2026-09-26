@@ -98,6 +98,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -107,6 +110,15 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
@@ -186,6 +198,18 @@ fun NowPlayingScreen(
     val error by remember(viewModel) {
         viewModel.state.map { it.error }.distinctUntilChanged()
     }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.error)
+
+    val isMixBlending by remember(viewModel) {
+        viewModel.state.map { it.isMixBlending }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.isMixBlending)
+
+    val mixProgress by remember(viewModel) {
+        viewModel.state.map { it.mixProgress }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.mixProgress)
+
+    val mixOutgoingTrack by remember(viewModel) {
+        viewModel.state.map { it.mixOutgoingTrack }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.mixOutgoingTrack)
 
     val positionFlow = remember(viewModel) {
         viewModel.state.map { it.positionMs }.distinctUntilChanged()
@@ -282,6 +306,9 @@ fun NowPlayingScreen(
                     ArtPanel(
                         track = track,
                         downloadState = currentTrackState,
+                        isMixBlending = isMixBlending,
+                        mixProgress = mixProgress,
+                        mixOutgoingTrack = mixOutgoingTrack,
                         onOpenArtist = {
                             targetArtistRef?.let(onOpenArtist)
                         },
@@ -617,14 +644,20 @@ fun NowPlayingScreen(
 private fun BlurredBackdrop(coverArtId: String?, modifier: Modifier = Modifier) {
     if (coverArtId.isNullOrBlank()) return
     Box(modifier = modifier.fillMaxSize()) {
-        CoverImage(
-            coverArtId = coverArtId,
-            size = 256,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(60.dp)
-                .alpha(0.30f),
-        )
+        Crossfade(
+            targetState = coverArtId,
+            animationSpec = tween(700, easing = FastOutSlowInEasing),
+            label = "BackdropCrossfade",
+        ) { currentCoverId ->
+            CoverImage(
+                coverArtId = currentCoverId,
+                size = 256,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(60.dp)
+                    .alpha(0.30f),
+            )
+        }
     }
 }
 
@@ -632,6 +665,9 @@ private fun BlurredBackdrop(coverArtId: String?, modifier: Modifier = Modifier) 
 private fun ArtPanel(
     track: Track,
     downloadState: TrackDownloadState?,
+    isMixBlending: Boolean = false,
+    mixProgress: Float = 0f,
+    mixOutgoingTrack: Track? = null,
     onOpenArtist: (() -> Unit)? = null,
     onDownloadClick: () -> Unit,
     onAddToPlaylistClick: () -> Unit,
@@ -643,38 +679,93 @@ private fun ArtPanel(
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CoverImage(
-            coverArtId = track.coverArtId,
-            size = 1024,
-            modifier = Modifier
-                .widthIn(max = 340.dp)
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(12.dp)),
-        )
+        // Spotify-style smooth scale & crossfade when track changes
+        AnimatedContent(
+            targetState = track.coverArtId to track.id,
+            transitionSpec = {
+                (fadeIn(animationSpec = tween(550, easing = FastOutSlowInEasing)) +
+                 scaleIn(initialScale = 0.94f, animationSpec = tween(550, easing = FastOutSlowInEasing)))
+                    .togetherWith(
+                        fadeOut(animationSpec = tween(450, easing = FastOutSlowInEasing)) +
+                        scaleOut(targetScale = 1.04f, animationSpec = tween(450, easing = FastOutSlowInEasing))
+                    )
+            },
+            label = "CoverArtTransition",
+        ) { (targetCoverId, _) ->
+            CoverImage(
+                coverArtId = targetCoverId,
+                size = 1024,
+                modifier = Modifier
+                    .widthIn(max = 340.dp)
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(12.dp)),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = isMixBlending,
+            enter = fadeIn(tween(400, easing = FastOutSlowInEasing)) + expandVertically(tween(400)),
+            exit = fadeOut(tween(350, easing = FastOutSlowInEasing)) + shrinkVertically(tween(350)),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(14.dp))
+                AutomixBlendPill(
+                    progress = mixProgress,
+                    outgoingTitle = mixOutgoingTrack?.title,
+                )
+            }
+        }
+
         Spacer(Modifier.height(20.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                MarqueeText(
-                    text = track.title,
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
-                    color = TextPrimary,
-                    textAlign = TextAlign.Start,
-                )
+                AnimatedContent(
+                    targetState = track.title,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(400, easing = FastOutSlowInEasing)) +
+                         slideInVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { height -> height / 3 })
+                            .togetherWith(
+                                fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+                                slideOutVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) { height -> -height / 3 }
+                            )
+                    },
+                    label = "TitleTransition",
+                ) { titleText ->
+                    MarqueeText(
+                        text = titleText,
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                        color = TextPrimary,
+                        textAlign = TextAlign.Start,
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
-                MarqueeText(
-                    text = track.artist ?: track.album.orEmpty(),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
-                    color = TextSecondary,
-                    textAlign = TextAlign.Start,
-                    modifier = if (onOpenArtist != null) {
-                        Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .clickable(onClick = onOpenArtist)
-                    } else Modifier,
-                )
+                AnimatedContent(
+                    targetState = (track.artist ?: track.album.orEmpty()) to track.id,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(400, easing = FastOutSlowInEasing)) +
+                         slideInVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { height -> height / 3 })
+                            .togetherWith(
+                                fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing)) +
+                                slideOutVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) { height -> -height / 3 }
+                            )
+                    },
+                    label = "ArtistTransition",
+                ) { (artistText, _) ->
+                    MarqueeText(
+                        text = artistText,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                        color = TextSecondary,
+                        textAlign = TextAlign.Start,
+                        modifier = if (onOpenArtist != null) {
+                            Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable(onClick = onOpenArtist)
+                        } else Modifier,
+                    )
+                }
             }
             IconButton(
                 onClick = onDownloadClick,
@@ -711,6 +802,84 @@ private fun ArtPanel(
                     contentDescription = "Add to playlist",
                     tint = TextPrimary,
                     modifier = Modifier.size(26.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutomixBlendPill(
+    progress: Float,
+    outgoingTitle: String?,
+    modifier: Modifier = Modifier,
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "AutomixWave")
+    val wave1 by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(420, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "w1",
+    )
+    val wave2 by infiniteTransition.animateFloat(
+        initialValue = 0.75f,
+        targetValue = 0.25f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(560, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "w2",
+    )
+    val wave3 by infiniteTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 0.95f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(490, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "w3",
+    )
+
+    Surface(
+        color = Color(0xFF1DB954).copy(alpha = 0.12f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, Color(0xFF1DB954).copy(alpha = 0.35f)),
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.5.dp),
+                verticalAlignment = Alignment.Bottom,
+                modifier = Modifier.height(12.dp),
+            ) {
+                Box(Modifier.width(2.5.dp).height((12 * wave1).dp).background(SpotifyGreen, CircleShape))
+                Box(Modifier.width(2.5.dp).height((12 * wave2).dp).background(SpotifyGreen, CircleShape))
+                Box(Modifier.width(2.5.dp).height((12 * wave3).dp).background(SpotifyGreen, CircleShape))
+            }
+            Text(
+                text = "AUTOMIX BLENDING ${(progress * 100).toInt()}%",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    fontSize = 10.sp,
+                ),
+                color = SpotifyGreen,
+            )
+            if (!outgoingTitle.isNullOrBlank()) {
+                Text(
+                    text = "• from ${outgoingTitle.take(16)}...",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                    ),
+                    color = TextSecondary,
+                    maxLines = 1,
                 )
             }
         }

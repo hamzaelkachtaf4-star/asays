@@ -29,6 +29,9 @@ data class PlayerUiState(
     val repeatMode: PlaybackRepeatMode = PlaybackRepeatMode.OFF,
     val error: String? = null,
     val activePlaylistId: String? = null,
+    val isMixBlending: Boolean = false,
+    val mixProgress: Float = 0f,
+    val mixOutgoingTrack: Track? = null,
 ) {
     val currentTrack: Track?
         get() = queue.getOrNull(currentIndex)
@@ -150,6 +153,16 @@ class PlayerQueueStore private constructor(
 
     fun setError(message: String?) {
         _state.update { it.copy(error = message) }
+    }
+
+    fun setMixBlending(isBlending: Boolean, progress: Float = 0f, outgoingTrack: Track? = null) {
+        _state.update {
+            it.copy(
+                isMixBlending = isBlending,
+                mixProgress = if (isBlending) progress else 0f,
+                mixOutgoingTrack = if (isBlending) outgoingTrack else null,
+            )
+        }
     }
 
     fun togglePlayPause() {

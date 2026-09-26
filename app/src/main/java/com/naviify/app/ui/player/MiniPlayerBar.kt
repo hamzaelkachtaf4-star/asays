@@ -1,5 +1,7 @@
 package com.naviify.app.ui.player
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import com.naviify.app.ui.components.MarqueeText
 import androidx.compose.foundation.clickable
@@ -124,25 +126,43 @@ fun MiniPlayerContent(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CoverImage(
-                coverArtId = track.coverArtId,
-                size = 256,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(6.dp)),
-            )
+            Crossfade(
+                targetState = track.coverArtId to track.id,
+                animationSpec = tween(400),
+                label = "MiniCoverCrossfade",
+            ) { (coverId, _) ->
+                CoverImage(
+                    coverArtId = coverId,
+                    size = 256,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(6.dp)),
+                )
+            }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                MarqueeText(
-                    text = track.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
-                )
-                MarqueeText(
-                    text = track.artist ?: track.album.orEmpty(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary,
-                )
+                Crossfade(
+                    targetState = track.title,
+                    animationSpec = tween(300),
+                    label = "MiniTitleCrossfade",
+                ) { titleText ->
+                    MarqueeText(
+                        text = titleText,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                    )
+                }
+                Crossfade(
+                    targetState = (track.artist ?: track.album.orEmpty()) to track.id,
+                    animationSpec = tween(300),
+                    label = "MiniArtistCrossfade",
+                ) { (artistText, _) ->
+                    MarqueeText(
+                        text = artistText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
+                    )
+                }
             }
             IconButton(onClick = onTogglePlayPause) {
                 Icon(

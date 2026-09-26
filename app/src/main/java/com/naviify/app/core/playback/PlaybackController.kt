@@ -41,6 +41,7 @@ import com.naviify.app.domain.model.PlaylistMixMode
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
@@ -122,9 +123,18 @@ class PlaybackController @Inject constructor(
     private var tailPlayer: ExoPlayer? = null
     private var transitionJob: Job? = null
     private var isMixTransitionTriggered = false
+    private var isTailPrewarmed = false
 
     private fun getOrCreateTailPlayer(): ExoPlayer {
         tailPlayer?.let { return it }
+        val lowLatencyLoadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                15_000,
+                30_000,
+                100,
+                250,
+            )
+            .build()
         val newPlayer = ExoPlayer.Builder(context)
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -133,6 +143,7 @@ class PlaybackController @Inject constructor(
                     .build(),
                 false,
             )
+            .setLoadControl(lowLatencyLoadControl)
             .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
             .build()
         tailPlayer = newPlayer
@@ -150,6 +161,8 @@ class PlaybackController @Inject constructor(
         }
         controller?.volume = 1.0f
         isMixTransitionTriggered = false
+        isTailPrewarmed = false
+        store.setMixBlending(false)
     }
 
     init {
@@ -172,6 +185,8 @@ class PlaybackController @Inject constructor(
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             if (transitionJob?.isActive != true) {
                 isMixTransitionTriggered = false
+                isTailPrewarmed = false
+                store.setMixBlending(false)
                 controller?.volume = 1.0f
             }
             val shouldSleep = _isSleepUntilTrackEnd.value
@@ -600,6 +615,17 @@ class PlaybackController @Inject constructor(
         if (durationMs <= overlapMs || durationMs < 6000L) return
 
         val transitionStartMs = durationMs - overlapMs
+
+        // 1. Pre-warm tail player 2.5s before transition starts so it is already buffered in memory
+        val prewarmStartMs = (transitionStartMs - 2500L).coerceAtLeast(0L)
+        if (positionMs in prewarmStartMs until transitionStartMs && !isTailPrewarmed && transitionJob?.isActive != true) {
+            val fromTrack = queue.getOrNull(currentIndex)
+            if (fromTrack != null) {
+                prewarmTail(fromTrack, transitionStartMs)
+            }
+        }
+
+        // 2. Trigger mix transition when reaching transitionStartMs
         if (positionMs >= transitionStartMs && !isMixTransitionTriggered && transitionJob?.isActive != true) {
             val fromTrack = queue.getOrNull(currentIndex) ?: return
             val nextIndex = if (currentIndex in 0 until (queueSize - 1)) currentIndex + 1 else 0
@@ -608,6 +634,25 @@ class PlaybackController @Inject constructor(
 
             isMixTransitionTriggered = true
             executeMixTransition(session, fromTrack, toTrack, positionMs, overlapMs, transitionMode, config)
+        }
+    }
+
+    private fun prewarmTail(fromTrack: Track, targetPosMs: Long) {
+        isTailPrewarmed = true
+        scope.launch {
+            runCatching {
+                val tail = getOrCreateTailPlayer()
+                val fromMediaItem = itemMapper.trackItem(fromTrack)
+                tail.stop()
+                tail.clearMediaItems()
+                tail.setMediaItem(fromMediaItem, targetPosMs)
+                tail.volume = 0f
+                tail.playWhenReady = false
+                tail.prepare()
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Pre-warmed tail player at ${targetPosMs}ms for '${fromTrack.title}'")
+                }
+            }
         }
     }
 
@@ -631,32 +676,58 @@ class PlaybackController @Inject constructor(
                 session.seekToNextMediaItem()
                 session.volume = 1.0f
                 isMixTransitionTriggered = false
-                return@launch
-            }
-
-            val tailStarted = runCatching {
-                val tail = getOrCreateTailPlayer()
-                val fromMediaItem = itemMapper.trackItem(fromTrack)
-                tail.stop()
-                tail.setMediaItem(fromMediaItem, currentPosMs)
-                tail.volume = 1.0f
-                tail.prepare()
-                tail.playWhenReady = true
-                tail.play()
-                true
-            }.getOrDefault(false)
-
-            if (!tailStarted) {
-                session.seekToNextMediaItem()
-                session.volume = 1.0f
-                isMixTransitionTriggered = false
+                isTailPrewarmed = false
+                store.setMixBlending(false)
                 return@launch
             }
 
             val tail = getOrCreateTailPlayer()
-            // Main player immediately seeks and starts incoming track
-            session.volume = 0.05f
+
+            // Verify tail is ready; if not pre-warmed, prepare and wait for STATE_READY
+            // while session continues playing uninterrupted at full volume!
+            val isReady = if (isTailPrewarmed && tail.playbackState == Player.STATE_READY) {
+                true
+            } else {
+                runCatching {
+                    val fromMediaItem = itemMapper.trackItem(fromTrack)
+                    if (tail.currentMediaItem?.mediaId != fromMediaItem.mediaId) {
+                        tail.stop()
+                        tail.clearMediaItems()
+                        tail.setMediaItem(fromMediaItem, currentPosMs)
+                        tail.volume = 0f
+                        tail.playWhenReady = false
+                        tail.prepare()
+                    }
+                    var attempts = 0
+                    while (tail.playbackState != Player.STATE_READY && attempts < 25 && isActive) {
+                        delay(20L)
+                        attempts++
+                    }
+                    tail.playbackState == Player.STATE_READY
+                }.getOrDefault(false)
+            }
+
+            if (!isReady || !isActive) {
+                if (BuildConfig.DEBUG) Log.w(TAG, "Tail player was not ready in time; falling back to direct seek")
+                session.seekToNextMediaItem()
+                session.volume = 1.0f
+                isMixTransitionTriggered = false
+                isTailPrewarmed = false
+                store.setMixBlending(false)
+                return@launch
+            }
+
+            // 1. Unmute and start tail FIRST so fromTrack audio continues playing without even 1ms gap
+            tail.volume = 1.0f
+            tail.playWhenReady = true
+            tail.play()
+
+            // 2. Main player starts incoming track at 0 volume (inaudible while buffering)
+            session.volume = 0.0f
             session.seekToNextMediaItem()
+
+            // 3. Mark store as blending for UI animations
+            store.setMixBlending(true, 0f, fromTrack)
 
             val startTime = SystemClock.elapsedRealtime()
             val totalSpanMs = overlapMs.toFloat()
@@ -668,12 +739,13 @@ class PlaybackController @Inject constructor(
                 val (outGain, inGain) = calculateMixGains(progress, transitionMode, config.equalPowerVolume)
 
                 tail.volume = outGain.coerceIn(0f, 1f)
-                session.volume = inGain.coerceIn(0.01f, 1f)
+                session.volume = inGain.coerceIn(0f, 1f)
+                store.setMixBlending(true, progress, fromTrack)
 
                 if (progress >= 1f || tail.playbackState == Player.STATE_ENDED || tail.playbackState == Player.STATE_IDLE) {
                     break
                 }
-                delay(35L)
+                delay(30L)
             }
 
             runCatching {
@@ -682,6 +754,8 @@ class PlaybackController @Inject constructor(
             }
             session.volume = 1.0f
             isMixTransitionTriggered = false
+            isTailPrewarmed = false
+            store.setMixBlending(false)
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "DJ mix transition completed: now playing '${toTrack.title}' at 1.0 volume")
             }
