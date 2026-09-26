@@ -17,6 +17,8 @@ import com.naviify.app.ui.common.toUserMessage
 import com.naviify.app.core.storage.PlaylistMixStore
 import com.naviify.app.domain.model.PlaylistMixConfig
 import com.naviify.app.domain.model.PlaylistMixMode
+import com.naviify.app.domain.model.DjTrackMeta
+import com.naviify.app.data.djmeta.DjMetadataRepository
 import com.naviify.app.domain.model.sortTracksHarmonically
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -74,6 +76,7 @@ class PlaylistDetailViewModel @Inject constructor(
     private val playlistHistoryStore: PlaylistHistoryStore,
     private val serverConfigStore: ServerConfigStore,
     private val playlistMixStore: PlaylistMixStore,
+    private val djMetadataRepository: DjMetadataRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -81,10 +84,18 @@ class PlaylistDetailViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(PlaylistDetailUiState())
     val uiState: StateFlow<PlaylistDetailUiState> = _uiState.asStateFlow()
+
+    /**
+     * Metadonnees DJ mesurees (BPM + Camelot) chargees depuis l'analyseur du
+     * serveur : cle = Track.id. Vide tant que le catalogue n'est pas charge.
+     */
+    val djMeta: StateFlow<Map<String, DjTrackMeta>> = djMetadataRepository.meta
+
     private var reorderJob: Job? = null
 
     init {
         load()
+        djMetadataRepository.ensureLoaded(viewModelScope)
         viewModelScope.launch {
             serverConfigStore.config.collect { cfg ->
                 val name = cfg.username.trim().ifEmpty { "tayeb" }

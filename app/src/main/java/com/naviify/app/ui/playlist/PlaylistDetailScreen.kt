@@ -48,8 +48,9 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.WaterDrop
 import com.naviify.app.domain.model.PlaylistMixMode
-import com.naviify.app.domain.model.getDjBpm
-import com.naviify.app.domain.model.getCamelotKey
+import com.naviify.app.domain.model.DjTrackMeta
+import com.naviify.app.domain.model.realBpmOf
+import com.naviify.app.domain.model.realCamelotOf
 import com.naviify.app.ui.components.formatDuration
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -171,6 +172,8 @@ fun PlaylistDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val downloadStatus by downloadViewModel.status.collectAsStateWithLifecycle()
+    // BPM + tonalite mesures (analyseur serveur) : cle = Track.id.
+    val djMeta by viewModel.djMeta.collectAsStateWithLifecycle()
     val playlist = state.playlist
     val isVirtualLibrary = playlist?.id == "virtual-library"
     val isMasterLibrary = playlist?.name?.trim().equals(com.naviify.app.data.repository.MediaRepository.VIRTUAL_LIBRARY_NAME, ignoreCase = true)
@@ -1133,6 +1136,7 @@ fun PlaylistDetailScreen(
                                 downloadState = stateForTrack,
                                 onOptionsClick = { selectedTrackForOptions = Pair(index, track) },
                                 onClick = { viewModel.playFrom(index) },
+                                djMeta = djMeta,
                             )
 
                             if (index < state.sortedTracks.size - 1) {
@@ -1733,9 +1737,12 @@ fun SpotifyMixTrackRow(
     onOptionsClick: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** BPM + Camelot mesures (analyseur serveur). Vide = rien d'affiche. */
+    djMeta: Map<String, DjTrackMeta> = emptyMap(),
 ) {
-    val bpm = getDjBpm(track.id, track.title)
-    val camelot = getCamelotKey(track.id, track.artist)
+    // Valeurs reellement mesurees : plus aucun BPM/cle fabrique par un hash.
+    val bpm = realBpmOf(track, djMeta)
+    val camelot = realCamelotOf(track, djMeta)
 
     Row(
         modifier = modifier
@@ -1834,33 +1841,37 @@ fun SpotifyMixTrackRow(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(
-                text = "$bpm bpm",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal,
-                ),
-                color = TextSecondary,
-            )
+            if (bpm != null) {
+                Text(
+                    text = "$bpm bpm",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                    ),
+                    color = TextSecondary,
+                )
 
-            Spacer(Modifier.height(3.dp))
+                Spacer(Modifier.height(3.dp))
+            }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                // Camelot Key Badge (e.g. 4A, 10A, 1A, 8A)
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = Color(camelot.colorHex),
-                ) {
-                    Text(
-                        text = camelot.code,
-                        color = Color.Black,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-                    )
+                // Badge Camelot : uniquement quand la tonalite a ete mesuree.
+                camelot?.let { key ->
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(key.colorHex),
+                    ) {
+                        Text(
+                            text = key.code,
+                            color = Color.Black,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                        )
+                    }
                 }
 
                 Text(

@@ -41,6 +41,8 @@ data class Track(
     val contentType: String? = null,
     val suffix: String? = null,
     val bitRate: Int? = null,
+    /** BPM reel remonte par l'API Subsonic (tag TBPM ecrit par l'analyseur serveur). */
+    val bpm: Int? = null,
     val path: String? = null,
     val isFavorite: Boolean = false,
     val created: String? = null,

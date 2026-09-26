@@ -52,6 +52,7 @@ fun Child.toTrack(): Track = Track(
     contentType = contentType,
     suffix = suffix,
     bitRate = bitRate,
+    bpm = bpm,
     path = path,
     isFavorite = starred ?: false,
     created = created,

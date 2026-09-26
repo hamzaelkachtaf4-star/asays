@@ -146,6 +146,8 @@ data class Child(
     @SerialName("transcodedSuffix") val transcodedSuffix: String? = null,
     val duration: Int? = null,
     @SerialName("bitRate") val bitRate: Int? = null,
+    /** Tag TBPM ecrit par l'analyseur DJ du serveur (OpenSubsonic expose `bpm`). */
+    val bpm: Int? = null,
     val path: String? = null,
     @SerialName("playCount") val playCount: Long? = null,
     val created: String? = null,
