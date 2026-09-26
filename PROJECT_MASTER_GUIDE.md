@@ -396,6 +396,12 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - `HomeScreen` : section "Radio du jour" (LazyRow de cartes facon Spotify - tuile degradee batie sur la couleur d'accent envoyee par le serveur, nom + nombre de titres, aucune image distante). Tap = lance la station en lecture melangee puis ouvre le lecteur (`onOpenNowPlaying`, cable dans `MainShell`).
 - Contrat verifie automatiquement : les champs du JSON serveur correspondent exactement aux DTO (racine / station / titre).
 
+### 50. Lecteur : fond sans flou, carte paroles simplifiee, ouverture allegee
+- **`BlurredBackdrop` : plus aucun `blur()`.** Le fond = pochette 256px a 20% + degrade vertical. La variante "calque 128dp agrandi 6x" laissait un **carre visible** au milieu de l'ecran (signale par Tayeb) ; deux rectangles suffisent et ne declenchent aucun RenderEffect plein ecran.
+- **`InPageSyncedLyrics` : plus de mesure ni d'offset anime.** Bloc fixe = ligne precedente (contexte) + ligne active + 3 suivantes, remplace par un fondu (`AnimatedContent`) a chaque changement. Corrige : ligne active coupee en bas du cadre (le dernier offset restait sous le masque) et etat casse au retour du plein ecran (les hauteurs mesurees devenaient fausses des que la fenetre glissait).
+- **Ouverture du lecteur allegee** : pochette 1024 -> 768 px (affichee sur 340dp max), fond 512 -> 256 px ; transitions pochette 550/450 -> 330/280 ms. Moins de decodage = moins de coupures en arrivant depuis la recherche.
+
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
