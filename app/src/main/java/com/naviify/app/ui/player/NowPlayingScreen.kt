@@ -669,7 +669,9 @@ private fun BlurredBackdrop(coverArtId: String?, modifier: Modifier = Modifier) 
         ) { currentCoverId ->
             CoverImage(
                 coverArtId = currentCoverId,
-                size = 512,
+                // 256 : le fond est affiche a 20% d'opacite derriere un degrade,
+                // inutile de decoder une grande image pour un lavis.
+                size = 256,
                 modifier = Modifier
                     .fillMaxSize()
                     .alpha(0.20f),
@@ -711,18 +713,21 @@ private fun ArtPanel(
         AnimatedContent(
             targetState = track.coverArtId to track.id,
             transitionSpec = {
-                (fadeIn(animationSpec = tween(550, easing = FastOutSlowInEasing)) +
-                 scaleIn(initialScale = 0.94f, animationSpec = tween(550, easing = FastOutSlowInEasing)))
+                (fadeIn(animationSpec = tween(330, easing = FastOutSlowInEasing)) +
+                 scaleIn(initialScale = 0.94f, animationSpec = tween(330, easing = FastOutSlowInEasing)))
                     .togetherWith(
-                        fadeOut(animationSpec = tween(450, easing = FastOutSlowInEasing)) +
-                        scaleOut(targetScale = 1.04f, animationSpec = tween(450, easing = FastOutSlowInEasing))
+                        fadeOut(animationSpec = tween(280, easing = FastOutSlowInEasing)) +
+                        scaleOut(targetScale = 1.04f, animationSpec = tween(280, easing = FastOutSlowInEasing))
                     )
             },
             label = "CoverArtTransition",
         ) { (targetCoverId, _) ->
             CoverImage(
                 coverArtId = targetCoverId,
-                size = 1024,
+                // 768 et non 1024 : la pochette est affichee sur 340dp au maximum,
+                // 768px suffit et le decodage est nettement plus leger (c'est l'un
+                // des deux decodages payes a l'ouverture du lecteur, avec le fond).
+                size = 768,
                 modifier = Modifier
                     .widthIn(max = 340.dp)
                     .aspectRatio(1f)
@@ -1192,16 +1197,15 @@ private fun AppleMusicLyricLineItem(
 /**
  * Paroles de la carte "en cours de lecture" : **AUCUN defilement**.
  *
- * Le bloc n'est pas une liste defilante. Toutes les lignes sont mesurees une
- * seule fois (onGloballyPositioned), puis le conteneur glisse verticalement
- * (translationY, un seul calque GPU) pour garder la ligne active a ~42% du
- * cadre. Deux consequences voulues :
- *  - le doigt ne peut plus "scroller dans les paroles" : aucun detecteur de
- *    defilement n'est installe, le geste remonte a la page (c'etait le probleme
- *    signale : impossible de faire defiler la page quand le doigt tombait sur
- *    les paroles, et l'auto-scroll se battait avec le doigt) ;
- *  - l'animation est stable : elle ne depend que du morceau, jamais d'un etat
- *    de defilement ("browsing") qui faisait clignoter l'effet.
+ * Le bloc n'est ni une liste defilante ni un conteneur decale : il n'affiche que
+ * la ligne active, la precedente (contexte) et les 3 suivantes, et le bloc entier
+ * est remplace par un fondu a chaque changement de ligne. Consequences voulues :
+ *  - aucune mesure de hauteur ni offset anime -> rien a recaler, donc plus de
+ *    ligne coupee au bord, plus d'etat casse en revenant du plein ecran ;
+ *  - le doigt ne peut pas "scroller dans les paroles" : aucun detecteur de
+ *    defilement, le geste remonte a la page ;
+ *  - trois `Text` par bloc au lieu de 14 lignes animees : l'ouverture du lecteur
+ *    ne compose plus qu'une poignee de vues.
  *
  * Un tap n'importe ou ouvre la vue plein ecran (lecture seule ici, pas de saut).
  */
