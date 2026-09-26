@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -74,6 +75,17 @@ class HomeViewModel @Inject constructor(
     companion object {
         @Volatile
         private var cachedHomeUiState: HomeUiState? = null
+
+        /** Date du dernier chargement reussi (survit a la recreation du ViewModel). */
+        @Volatile
+        private var cachedAtMs: Long = 0L
+
+        /**
+         * Duree pendant laquelle le contenu deja a l'ecran est considere comme frais :
+         * en dessous, revenir sur l'accueil n'entraine aucune requete reseau et aucune
+         * reconstruction complete de l'ecran.
+         */
+        private const val FRESHNESS_MS = 60_000L
     }
 
     private val _uiState = MutableStateFlow(cachedHomeUiState ?: HomeUiState())
@@ -108,6 +120,9 @@ class HomeViewModel @Inject constructor(
                         .sorted()
                 }
                 .distinctUntilChanged()
+                // Le filtre/tri/comparaison reste hors du thread principal : chaque
+                // progression de telechargement declenchait sinon du travail UI.
+                .flowOn(Dispatchers.Default)
                 .collect {
                     if (_uiState.value.isOfflineMode) {
                         loadOfflineState()
@@ -132,7 +147,20 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun load() {
+    fun load() = loadInternal(force = false)
+
+    /** Rechargement complet demande par l'utilisateur (bouton "Reessayer"). */
+    fun refresh() = loadInternal(force = true)
+
+    private fun loadInternal(force: Boolean) {
+        val cached = cachedHomeUiState
+        // Sortie rapide : le contenu est deja affiche et encore frais. Sans ce garde-fou,
+        // chaque retour sur l'accueil relancait 5 requetes reseau + la reconstruction
+        // complete de l'ecran (et de toutes ses images).
+        if (!force && cached != null && System.currentTimeMillis() - cachedAtMs < FRESHNESS_MS) {
+            if (_uiState.value.isLoading) _uiState.value = _uiState.value.copy(isLoading = false)
+            return
+        }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             val config = serverConfigStore.config.first()
@@ -241,6 +269,7 @@ class HomeViewModel @Inject constructor(
                         isOfflineMode = current.isOfflineMode,
                     )
                     cachedHomeUiState = finalState
+                    cachedAtMs = System.currentTimeMillis()
                     finalState
                 }
             }.onFailure { error ->
@@ -339,6 +368,7 @@ class HomeViewModel @Inject constructor(
                 serverLabel = current.serverLabel,
             )
             cachedHomeUiState = offlineState
+            cachedAtMs = System.currentTimeMillis()
             offlineState
         }
     }

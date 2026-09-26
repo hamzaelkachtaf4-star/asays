@@ -619,7 +619,18 @@ fun PlaylistCoverArt(
     // @Composable accessor and cannot be invoked from a lambda.
     val imageContext = androidx.compose.ui.platform.LocalContext.current
 
-    val patternModifier = if (resolvedModel == null) {
+    // Brush statique memoise : il etait recree a chaque recomposition, donc une
+    // allocation par vignette et par frame de scroll.
+    val gradientBrush = remember(theme) {
+        Brush.linearGradient(
+            colors = theme.gradientColors,
+            start = Offset(0f, 0f),
+            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
+        )
+    }
+
+    val patternModifier = remember(theme, resolvedModel) {
+        if (resolvedModel == null) {
         Modifier.drawBehind {
             val w = size.width
             val h = size.height
@@ -675,16 +686,11 @@ fun PlaylistCoverArt(
             }
         }
     } else Modifier
+    }
 
     Box(
         modifier = modifier
-            .background(
-                brush = Brush.linearGradient(
-                    colors = theme.gradientColors,
-                    start = Offset(0f, 0f),
-                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
-                ),
-            )
+            .background(brush = gradientBrush)
             .then(patternModifier),
         contentAlignment = Alignment.Center,
     ) {

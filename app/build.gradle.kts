@@ -26,7 +26,21 @@ android {
         }
     }
 
+    signingConfigs {
+        // Keystore de debug genere automatiquement par Android Studio sur le Mac.
+        // Il signe les builds "perf" et "release" pour qu'ils soient installables
+        // en local. A remplacer par un vrai keystore pour une publication Play Store.
+        create("localDebug") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        val localSigning = signingConfigs.getByName("localDebug")
+
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
@@ -34,10 +48,27 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Sans signingConfig, assembleRelease produit un APK non signe, donc
+            // non installable : impossible de mesurer la performance reelle.
+            signingConfig = localSigning
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+        // Build "perf" : le meme que release (non debuggable -> ART optimise, sans
+        // ui-tooling Compose) mais sans R8 et signe avec le keystore de debug.
+        // C'est LE build a installer pour juger la fluidite de l'interface.
+        // Il reprend l'id du build debug : l'installer remplace l'app existante et
+        // conserve les identifiants serveur et les reglages deja saisis.
+        create("perf") {
+            initWith(getByName("release"))
+            signingConfig = localSigning
+            isMinifyEnabled = false
+            isShrinkResources = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-perf"
+            matchingFallbacks += listOf("release")
         }
     }
 

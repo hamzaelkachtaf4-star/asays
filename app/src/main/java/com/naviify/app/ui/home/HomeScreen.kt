@@ -99,6 +99,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val isOffline = state.isOfflineMode || (!state.serverReachable && state.quickPicks.isEmpty())
     val displayQuickPicks = state.quickPicks
     val displayRecentlyAdded = state.recentlyAdded
@@ -422,11 +423,16 @@ fun HomeScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(8.dp),
                                 ) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
+                                    // Requete memoisee et sans crossfade : un fondu par vignette
+                                    // faisait travailler le GPU a chaque apparition au scroll.
+                                    val thumbRequest = remember(tileCover) {
+                                        ImageRequest.Builder(context)
                                             .data(tileCover)
-                                            .crossfade(true)
-                                            .build(),
+                                            .crossfade(false)
+                                            .build()
+                                    }
+                                    AsyncImage(
+                                        model = thumbRequest,
                                         contentDescription = null,
                                         contentScale = ContentScale.Crop,
                                         modifier = Modifier
@@ -603,7 +609,7 @@ fun HomeScreen(
             state.error?.let { message ->
                 ErrorBubble(
                     message = message,
-                    onRetry = viewModel::load,
+                    onRetry = viewModel::refresh,
                     onDismiss = viewModel::dismissError,
                 )
             }
@@ -627,6 +633,19 @@ private fun AppleMusicHeroCard(
     onPlay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    // Degrades statiques memoises : les recreer a chaque recomposition allouait
+    // deux objets de plus par image affichee.
+    val placeholderBrush = remember { Brush.linearGradient(listOf(Color(0xFF2E2E2E), Color(0xFF121212))) }
+    val scrimBrush = remember {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color.Black.copy(alpha = 0.50f),
+                Color.Transparent,
+                Color.Black.copy(alpha = 0.88f),
+            ),
+        )
+    }
     Surface(
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
@@ -639,11 +658,14 @@ private fun AppleMusicHeroCard(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (!coverUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
+                val heroRequest = remember(coverUrl) {
+                    ImageRequest.Builder(context)
                         .data(coverUrl)
-                        .crossfade(true)
-                        .build(),
+                        .crossfade(false)
+                        .build()
+                }
+                AsyncImage(
+                    model = heroRequest,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
@@ -652,11 +674,7 @@ private fun AppleMusicHeroCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color(0xFF2E2E2E), Color(0xFF121212)),
-                            ),
-                        ),
+                        .background(placeholderBrush),
                 )
             }
 
@@ -664,15 +682,7 @@ private fun AppleMusicHeroCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.50f),
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.88f),
-                            ),
-                        ),
-                    ),
+                    .background(scrimBrush),
             )
 
             // Tag badge at top left
