@@ -367,6 +367,14 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - Refresh : timer systemd user `genre-playlists.timer` (quotidien). Manuel : `python3 ~/scripts/genre_playlists.py`.
 - Cote app : rien a faire, Navidrome expose ces playlists comme les autres (verifie en base : les 5 presentes avec leurs comptes de titres).
 
+### 46. Lyrics : carte non defilante + plein ecran stable
+- Probleme signale : **impossible de faire defiler la page de lecture** quand le doigt tombait sur les paroles (la carte contenait une `LazyColumn` de 300dp qui consommait le geste et se battait avec l'auto-scroll), effet qui "clignotait", et l'accentuation qui disparaissait quand on tapait une ligne pour s'y rendre.
+- `InPageSyncedLyrics` remplace la liste defilante dans `LyricsCard` : toutes les lignes sont mesurees une fois (`onGloballyPositioned`), puis le conteneur glisse via un seul `graphicsLayer { translationY = -animé }` pour garder la ligne active a ~42% du cadre. **Aucun detecteur de defilement n'est installe** -> le geste remonte a la page. Un tap n'importe ou ouvre le plein ecran (`detectTapGestures`), comme demande.
+- Plus de mode "browsing" dans la carte : l'animation ne depend que de la position de lecture -> l'effet ne clignote plus. Masque de fondu haut/bas conserve (les lignes en bord s'estompent au lieu d'etre coupees).
+- Plein ecran : entree/sortie adoucies (`AnimatedVisibility` fade + slide ~200ms) au lieu d'une coupure nette ; le defilement et le tap-pour-seek restent.
+- Plein ecran : la ligne active garde **toujours** alpha 1.0 + scale 1.05, meme en mode "browsing" (avant, le browsing passait toutes les lignes a 0.82 : en tapant une ligne, l'effet semblait disparaitre).
+- Regle a retenir : un bloc de paroles dans une page defilante ne doit JAMAIS contenir de liste defilante.
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
