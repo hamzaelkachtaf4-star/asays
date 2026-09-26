@@ -220,6 +220,7 @@ fun NowPlayingScreen(
         viewModel.state.map { it.durationMs }.distinctUntilChanged()
     }
     val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
+    val lyricsBlurEnabled by viewModel.lyricsBlurEnabled.collectAsStateWithLifecycle()
     val artistState by viewModel.artistState.collectAsStateWithLifecycle()
     val downloadStatus by downloadViewModel.status.collectAsStateWithLifecycle()
     val playlistsState by playlistsViewModel.uiState.collectAsStateWithLifecycle()
@@ -353,17 +354,9 @@ fun NowPlayingScreen(
                         isLoading = lyricsState.isLoading,
                         lyrics = lyricsState.lyrics?.syncedLines.orEmpty(),
                         offsetMs = lyricsState.lyrics?.offsetMs ?: 0L,
+                        isBlurEnabled = lyricsBlurEnabled,
                         onSeekTo = { offsetMs -> viewModel.seekTo(offsetMs) },
                         onExpand = { showFullscreenLyrics = true },
-                        onShare = {
-                            shareLyrics(
-                                context = context,
-                                track = track,
-                                lyrics = lyricsState.lyrics?.syncedLines.orEmpty(),
-                                plainLyrics = lyricsState.lyrics?.plainText,
-                            )
-                        },
-                        onAdjustTiming = { showAdjustLyrics = true },
                         onOpenOptions = { showLyricsOptions = true },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -392,19 +385,11 @@ fun NowPlayingScreen(
                 track = track,
                 lyrics = lyricsState.lyrics?.syncedLines.orEmpty(),
                 offsetMs = lyricsState.lyrics?.offsetMs ?: 0L,
+                isBlurEnabled = lyricsBlurEnabled,
                 onSeekTo = viewModel::seekTo,
                 onTogglePlayPause = viewModel::togglePlayPause,
                 onPrevious = viewModel::previous,
                 onNext = viewModel::next,
-                onShare = {
-                    shareLyrics(
-                        context = context,
-                        track = track,
-                        lyrics = lyricsState.lyrics?.syncedLines.orEmpty(),
-                        plainLyrics = lyricsState.lyrics?.plainText,
-                    )
-                },
-                onAdjustTiming = { showAdjustLyrics = true },
                 onOpenOptions = { showLyricsOptions = true },
                 onDismiss = { showFullscreenLyrics = false },
             )
@@ -562,6 +547,8 @@ fun NowPlayingScreen(
             hasLyrics = lyricsState.lyrics?.hasLyrics == true,
             currentOffsetMs = lyricsState.lyrics?.offsetMs ?: 0L,
             isCustomLyrics = viewModel.isCurrentTrackLyricsCustom(),
+            isBlurEnabled = lyricsBlurEnabled,
+            onToggleBlur = { enabled -> viewModel.setLyricsBlurEnabled(enabled) },
             onAdjustTiming = {
                 showLyricsOptions = false
                 showAdjustLyrics = true
@@ -610,6 +597,14 @@ fun NowPlayingScreen(
             onReportLyrics = {
                 showLyricsOptions = false
                 showReportLyrics = true
+            },
+            onShareLyrics = {
+                shareLyrics(
+                    context = context,
+                    track = track,
+                    lyrics = lyricsState.lyrics?.syncedLines.orEmpty(),
+                    plainLyrics = lyricsState.lyrics?.plainText,
+                )
             },
             onDismiss = { showLyricsOptions = false },
         )
@@ -894,17 +889,16 @@ private fun LyricsCard(
     isLoading: Boolean,
     lyrics: List<LyricsLineData>,
     offsetMs: Long = 0L,
+    isBlurEnabled: Boolean = true,
     onSeekTo: (Long) -> Unit,
     onExpand: () -> Unit,
-    onShare: () -> Unit,
-    onAdjustTiming: () -> Unit,
     onOpenOptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         color = Color(0xFF242424),
         shape = RoundedCornerShape(20.dp),
-        modifier = modifier,
+        modifier = modifier.clickable { onExpand() },
     ) {
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
             Row(
@@ -918,32 +912,6 @@ private fun LyricsCard(
                     modifier = Modifier.weight(1f),
                 )
                 if (lyrics.isNotEmpty()) {
-                    if (lyrics.any { it.startMs != null }) {
-                        IconButton(
-                            onClick = onAdjustTiming,
-                            modifier = Modifier.size(36.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Tune,
-                                contentDescription = "Adjust lyrics timing",
-                                tint = if (offsetMs != 0L) SpotifyGreen else Color.White.copy(alpha = 0.85f),
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    IconButton(
-                        onClick = onShare,
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Share,
-                            contentDescription = "Share lyrics",
-                            tint = Color.White.copy(alpha = 0.85f),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(4.dp))
                     IconButton(
                         onClick = onExpand,
                         modifier = Modifier.size(36.dp),
@@ -1005,7 +973,9 @@ private fun LyricsCard(
                     lyrics = lyrics,
                     offsetMs = offsetMs,
                     onSeekTo = onSeekTo,
+                    onExpand = onExpand,
                     isFullScreen = false,
+                    isBlurEnabled = isBlurEnabled,
                 )
             }
         }
@@ -1017,40 +987,28 @@ private fun InstrumentalGapDots(
     isActive: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    // Volontairement discret : une seule valeur animee pour les 3 puces, pulsation lente et douce.
     val transition = rememberInfiniteTransition(label = "instrumental_gap")
+    val animAlpha by transition.animateFloat(
+        initialValue = 0.18f,
+        targetValue = if (isActive) 0.55f else 0.26f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "gap_alpha",
+    )
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.padding(vertical = 12.dp, horizontal = 4.dp),
+        modifier = modifier.padding(vertical = 8.dp, horizontal = 4.dp),
     ) {
         for (i in 0 until 3) {
-            val animAlpha by transition.animateFloat(
-                initialValue = 0.30f,
-                targetValue = 1.0f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 650, delayMillis = i * 220, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "dot_alpha_$i",
-            )
-            val animScale by transition.animateFloat(
-                initialValue = 0.75f,
-                targetValue = 1.15f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 650, delayMillis = i * 220, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "dot_scale_$i",
-            )
             Box(
                 modifier = Modifier
-                    .size(9.dp)
-                    .scale(if (isActive) animScale else 0.8f)
+                    .size(5.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (isActive) Color.White.copy(alpha = animAlpha)
-                        else Color.White.copy(alpha = 0.25f),
-                    ),
+                    .background(Color.White.copy(alpha = animAlpha)),
             )
         }
     }
