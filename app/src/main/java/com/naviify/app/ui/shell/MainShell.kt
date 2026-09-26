@@ -225,11 +225,15 @@ fun MainShell(
                 }
                 composable(
                     route = Routes.NOW_PLAYING,
+                    // 240/220 ms au lieu de 400/350 : la transition ne dure plus que
+                    // le temps de quelques frames. Sur cet ecran (fond + pochette +
+                    // paroles), un slide long laissait le temps de voir les frames
+                    // manquees a l'ouverture depuis la recherche.
                     enterTransition = {
                         slideIntoContainer(
                             towards = AnimatedContentTransitionScope.SlideDirection.Up,
                             animationSpec = tween(
-                                durationMillis = 400,
+                                durationMillis = 240,
                                 easing = CubicBezierEasing(0.1f, 1f, 0.1f, 1f),
                             ),
                         )
@@ -238,7 +242,7 @@ fun MainShell(
                         slideOutOfContainer(
                             towards = AnimatedContentTransitionScope.SlideDirection.Down,
                             animationSpec = tween(
-                                durationMillis = 350,
+                                durationMillis = 220,
                                 easing = CubicBezierEasing(0.1f, 1f, 0.1f, 1f),
                             ),
                         )
@@ -247,7 +251,7 @@ fun MainShell(
                         slideIntoContainer(
                             towards = AnimatedContentTransitionScope.SlideDirection.Up,
                             animationSpec = tween(
-                                durationMillis = 400,
+                                durationMillis = 240,
                                 easing = CubicBezierEasing(0.1f, 1f, 0.1f, 1f),
                             ),
                         )
@@ -256,7 +260,7 @@ fun MainShell(
                         slideOutOfContainer(
                             towards = AnimatedContentTransitionScope.SlideDirection.Down,
                             animationSpec = tween(
-                                durationMillis = 350,
+                                durationMillis = 220,
                                 easing = CubicBezierEasing(0.1f, 1f, 0.1f, 1f),
                             ),
                         )

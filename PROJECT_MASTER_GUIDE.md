@@ -402,6 +402,13 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - **Ouverture du lecteur allegee** : pochette 1024 -> 768 px (affichee sur 340dp max), fond 512 -> 256 px ; transitions pochette 550/450 -> 330/280 ms. Moins de decodage = moins de coupures en arrivant depuis la recherche.
 
 
+### 51. Accueil sans "hero", radio en tete, ouverture du lecteur allegee
+- **Suppression de la carte "FEATURED PLAYLIST / FEATURED ALBUM"** (`heroItem` + `AppleMusicHeroCard`) : elle repetait un titre deja present dans la grille "Quick Access". La **section "Radio du jour" prend sa place, en tete de l'accueil** (avant la grille Quick Access). `AppleMusicHeroCard` reste definie mais n'est plus appelee (warning volontaire, gardee pour reutilisation).
+- **Ouverture depuis la recherche** : `SearchScreen` **precharge la pochette au format du lecteur (768 px, memes cles de cache que `CoverImage`)** des que l'utilisateur tape un resultat. Avant, l'image se telechargeait et se decodait pendant le slide d'ouverture -> frames manquees visibles.
+- **Transition du lecteur : 400/350 ms -> 240/220 ms** (`MainShell`). Le slide couvre moins de frames, les rares frames manquees ne sont plus visibles.
+- Rappel : aucun `blur()` ne subsiste dans l'app (verifie par `grep -rn '\.blur('`).
+
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas

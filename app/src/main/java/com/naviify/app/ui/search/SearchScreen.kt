@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Clear
@@ -89,6 +90,7 @@ fun SearchScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     val accentColor = LocalNaviifyPalette.current.accent
+    val context = LocalContext.current
 
     Column(modifier = Modifier.fillMaxSize()) {
         OutlinedTextField(
@@ -259,6 +261,19 @@ fun SearchScreen(
                 onPlayTrack = { index ->
                     val track = state.results.tracks[index]
                     viewModel.onTrackClicked(track)
+                    // Precharge la pochette au format du lecteur (768 px) pendant la
+                    // transition : sinon l'image se telecharge et se decode pendant le
+                    // slide, ce qui fait saccader l'animation d'ouverture.
+                    val coverUrl = com.naviify.app.core.image.CoverUrls.url(track.coverArtId, 768)
+                    if (coverUrl != null) {
+                        coil.Coil.imageLoader(context).enqueue(
+                            coil.request.ImageRequest.Builder(context)
+                                .data(coverUrl)
+                                .memoryCacheKey("cover-${track.coverArtId}-768")
+                                .diskCacheKey("cover-${track.coverArtId}-768")
+                                .build(),
+                        )
+                    }
                     playerViewModel.play(state.results.tracks, index)
                     onOpenNowPlaying()
                 },
