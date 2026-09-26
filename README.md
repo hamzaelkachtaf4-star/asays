@@ -1,4 +1,4 @@
-# <p align="center"><img src="docs/logo.png" alt="ASAYS Logo" width="90" style="vertical-align: middle;" /> <br><b>ASAYS (Naviify)</b></p>
+# <p align="center"><img src="docs/logo.png" alt="ASAYS Logo" width="90" style="vertical-align: middle;" /> <br><b>Asays</b></p>
 
 <p align="center">
   <b>A Hyper-Refined, Spotify-Grade Android Music Client for Self-Hosted Navidrome & Subsonic Servers.</b>
@@ -14,37 +14,49 @@
   <img src="https://img.shields.io/badge/Tests-94_Passed_·_100%25-brightgreen?style=for-the-badge" alt="Tests" />
 </p>
 
+> [!NOTE]
+> **🚧 Active Development & Frequent Updates**  
+> **Asays** is actively being developed and polished. The app is in continuous evolution — new features, performance enhancements, and bug fixes are rolling out on a regular basis.
+
 ---
 
 ## 📸 Screenshots Showcase
 
 <table align="center">
   <tr>
-    <td align="center" width="33%">
-      <b>Home & Ambient Glass</b><br><br>
-      <img src="docs/screenshots/home_screen.jpg" width="280" alt="Home Screen" />
+    <td align="center" width="25%">
+      <b>Home & Quick Access</b><br><br>
+      <img src="docs/screenshots/01_home_screen.jpg" width="240" alt="Home Screen" />
     </td>
-    <td align="center" width="33%">
-      <b>Playlist & DJ Mix Pills</b><br><br>
-      <img src="docs/screenshots/playlist_screen.jpg" width="280" alt="Playlist Screen" />
+    <td align="center" width="25%">
+      <b>Library & Playlists</b><br><br>
+      <img src="docs/screenshots/02_library_screen.jpg" width="240" alt="Library Screen" />
     </td>
-    <td align="center" width="33%">
-      <b>Smart FIFO Interactive Queue</b><br><br>
-      <img src="docs/screenshots/queue_sheet.jpg" width="280" alt="Queue Sheet" />
+    <td align="center" width="25%">
+      <b>Playlist Detail & DJ Mix</b><br><br>
+      <img src="docs/screenshots/03_playlist_detail.jpg" width="240" alt="Playlist Detail" />
+    </td>
+    <td align="center" width="25%">
+      <b>Artist Profile</b><br><br>
+      <img src="docs/screenshots/04_artist_detail.jpg" width="240" alt="Artist Detail" />
     </td>
   </tr>
   <tr>
-    <td align="center" width="33%">
-      <b>Dynamic Halo Theme</b><br><br>
-      <img src="docs/screenshots/playlist_detail_dark.jpg" width="280" alt="Ambient Halo Detail" />
+    <td align="center" width="25%">
+      <b>Full Discography</b><br><br>
+      <img src="docs/screenshots/05_artist_discography.jpg" width="240" alt="Artist Discography" />
     </td>
-    <td align="center" width="33%">
-      <b>Sync & Playlist Management</b><br><br>
-      <img src="docs/screenshots/playlist_options.jpg" width="280" alt="Playlist Actions Sheet" />
+    <td align="center" width="25%">
+      <b>Now Playing Player</b><br><br>
+      <img src="docs/screenshots/06_now_playing.jpg" width="240" alt="Now Playing Screen" />
     </td>
-    <td align="center" width="33%">
-      <b>Android Auto Coolwalk</b><br><br>
-      <img src="docs/screenshots/android_auto.jpg" width="280" alt="Android Auto In-Car" />
+    <td align="center" width="25%">
+      <b>Synced Lyrics & Queue</b><br><br>
+      <img src="docs/screenshots/07_lyrics_queue.jpg" width="240" alt="Lyrics & Queue" />
+    </td>
+    <td align="center" width="25%">
+      <b>Fullscreen Synced Lyrics</b><br><br>
+      <img src="docs/screenshots/08_fullscreen_lyrics.jpg" width="240" alt="Fullscreen Synced Lyrics" />
     </td>
   </tr>
 </table>
@@ -108,7 +120,7 @@ graph TD
     end
 
     subgraph AudioEngine["AndroidX Media3 Playback Engine"]
-        Service["NaviifyPlaybackService<br>(MediaLibraryService)"]
+        Service["PlaybackService<br>(MediaLibraryService)"]
         Controller["PlaybackController<br>(Dual-Player Engine)"]
         ExoMain["Main ExoPlayer<br>(Active Timeline)"]
         ExoTail["Tail Player<br>(Automix Blend Engine)"]
@@ -194,8 +206,8 @@ app/src/main/java/com/naviify/app/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/hamzaelkachtaf4-star/naviify.git
-cd naviify
+git clone https://github.com/hamzaelkachtaf4-star/asays.git
+cd asays
 
 # 2. Run the complete Unit Test suite (94 tests)
 ./gradlew testDebugUnitTest
