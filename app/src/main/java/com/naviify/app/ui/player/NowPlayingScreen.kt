@@ -709,6 +709,7 @@ private fun ArtPanel(
                 AutomixBlendPill(
                     progress = mixProgress,
                     outgoingTitle = mixOutgoingTrack?.title,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -840,43 +841,91 @@ private fun AutomixBlendPill(
         label = "w3",
     )
 
+    // Tout ce qui suit est capture ici, AVANT les lambdas : les couleurs du theme
+    // sont des @Composable get() et ne doivent jamais etre lues dans un
+    // scope non-composable.
+    val accent = SpotifyGreen
+    val titleColor = Color.White
+    val subtleColor = TextSecondary
+    val trackColor = Color.White.copy(alpha = 0.14f)
+    val dividerColor = Color.White.copy(alpha = 0.16f)
+
+    // PlaybackController pousse la progression toutes les 30 ms : on la lisse
+    // pour que le rail glisse au lieu de sauter.
+    val smoothProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 180),
+        label = "blend_progress",
+    )
+
     Surface(
-        color = Color(0xFF1DB954).copy(alpha = 0.12f),
+        color = Color.Black.copy(alpha = 0.55f),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, Color(0xFF1DB954).copy(alpha = 0.35f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
         modifier = modifier,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(2.5.dp),
                 verticalAlignment = Alignment.Bottom,
                 modifier = Modifier.height(12.dp),
             ) {
-                Box(Modifier.width(2.5.dp).height((12 * wave1).dp).background(SpotifyGreen, CircleShape))
-                Box(Modifier.width(2.5.dp).height((12 * wave2).dp).background(SpotifyGreen, CircleShape))
-                Box(Modifier.width(2.5.dp).height((12 * wave3).dp).background(SpotifyGreen, CircleShape))
+                Box(Modifier.width(2.5.dp).height((12 * wave1).dp).background(accent, CircleShape))
+                Box(Modifier.width(2.5.dp).height((12 * wave2).dp).background(accent, CircleShape))
+                Box(Modifier.width(2.5.dp).height((12 * wave3).dp).background(accent, CircleShape))
             }
             Text(
-                text = "AUTOMIX BLENDING ${(progress * 100).toInt()}%",
+                text = "BLENDING ${(progress * 100).toInt().coerceIn(0, 100)}%",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp,
+                    letterSpacing = 1.1.sp,
                     fontSize = 10.sp,
                 ),
-                color = SpotifyGreen,
+                color = titleColor,
             )
             if (!outgoingTitle.isNullOrBlank()) {
-                Text(
-                    text = "• from ${outgoingTitle.take(16)}...",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 10.sp,
-                    ),
-                    color = TextSecondary,
-                    maxLines = 1,
+                Spacer(Modifier.width(9.dp))
+                Box(
+                    Modifier
+                        .width(1.dp)
+                        .height(11.dp)
+                        .background(dividerColor),
+                )
+                Spacer(Modifier.width(9.dp))
+                // Plus de troncature "from Waiting Around T..." : le titre sortant
+                // defile en marquee quand il est trop long.
+                MarqueeText(
+                    text = "from $outgoingTitle",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = subtleColor,
+                    scrollSpeedPxPerSec = 28f,
+                    initialDelayMs = 900,
+                )
+            }
+            }
+            // Rail de progression du blend : la vraie progression audio, pas une
+            // animation decorative.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(CircleShape)
+                    .background(trackColor),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(smoothProgress.coerceIn(0f, 1f))
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(accent),
                 )
             }
         }
