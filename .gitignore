@@ -16,3 +16,6 @@ app/release/
 *.keystore
 !debug.keystore
 
+
+# verrou du harness vibe.sh
+.vibe.lock
