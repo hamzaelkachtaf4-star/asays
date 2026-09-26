@@ -93,6 +93,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -126,6 +127,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -134,6 +136,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -377,7 +380,19 @@ fun NowPlayingScreen(
             }
         }
 
-        if (showFullscreenLyrics) {
+        AnimatedVisibility(
+            visible = showFullscreenLyrics,
+            enter = fadeIn(animationSpec = tween(durationMillis = 200)) +
+                slideInVertically(
+                    initialOffsetY = { fullHeight -> fullHeight / 14 },
+                    animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+                ),
+            exit = fadeOut(animationSpec = tween(durationMillis = 160)) +
+                slideOutVertically(
+                    targetOffsetY = { fullHeight -> fullHeight / 14 },
+                    animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                ),
+        ) {
             LyricsFullScreenView(
                 isPlaying = isPlaying,
                 positionFlow = positionFlow,
@@ -1017,14 +1032,12 @@ private fun LyricsCard(
                         }
                     }
                 }
-                else -> SyncedLyricsList(
+                else -> InPageSyncedLyrics(
                     positionFlow = positionFlow,
                     lyrics = lyrics,
                     offsetMs = offsetMs,
-                    onSeekTo = onSeekTo,
-                    onExpand = onExpand,
-                    isFullScreen = false,
                     isBlurEnabled = isBlurEnabled,
+                    onOpenFullScreen = onExpand,
                 )
             }
         }
@@ -1075,6 +1088,7 @@ private fun AppleMusicLyricLineItem(
     offsetMs: Long,
     onSeekTo: (Long) -> Unit,
     onExpand: () -> Unit,
+    onPositioned: ((Int, Float, Float) -> Unit)? = null,
 ) {
     val isActive = isSynced && index == activeIndex
     val distance = if (activeIndex >= 0) kotlin.math.abs(index - activeIndex) else 0
@@ -1082,11 +1096,15 @@ private fun AppleMusicLyricLineItem(
     // Hierarchie douce : la ligne active reste franche, les autres ne tombent
     // jamais dans le noir. L'ancien 0.26 pour les lignes lointaines faisait
     // apparaitre un "degrade noir" des que la lecture sortait du mode browsing.
+    // La ligne active garde TOUJOURS son accentuation : meme quand on fait
+    // defiler le plein ecran (mode "browsing") elle reste franche et animee.
+    // Avant, le mode browsing passait toutes les lignes a 0.82 : en tapant une
+    // ligne pour s'y rendre, l'effet semblait disparaitre.
     val targetAlpha = when {
         !isSynced -> 0.88f
-        isBrowsing -> 0.82f
-        !isBlurEnabled -> if (isActive) 1.0f else 0.48f
         isActive -> 1.0f
+        !isBlurEnabled -> 0.48f
+        isBrowsing -> 0.80f
         distance == 1 -> 0.74f
         distance == 2 -> 0.62f
         else -> 0.50f
@@ -1094,8 +1112,8 @@ private fun AppleMusicLyricLineItem(
 
     val targetScale = when {
         !isSynced -> 1.0f
-        isBrowsing -> 1.0f
         isActive -> 1.05f
+        isBrowsing -> 1.0f
         distance == 1 -> 0.98f
         else -> 0.95f
     }
@@ -1126,15 +1144,18 @@ private fun AppleMusicLyricLineItem(
                 scaleY = animatedScale
                 transformOrigin = TransformOrigin(0f, 0.5f)
             }
-            .clickable(enabled = if (isFullScreen) line.startMs != null else true) {
-                if (isFullScreen) {
-                    // Plein ecran : tap = seek vers cette ligne
-                    line.startMs?.let { onSeekTo((it - offsetMs).coerceAtLeast(0L)) }
-                } else {
-                    // Carte repliee : tap = ouvrir le plein ecran (jamais de saut de lecture)
-                    onExpand()
-                }
+            .clickable(enabled = isFullScreen && line.startMs != null) {
+                line.startMs?.let { onSeekTo((it - offsetMs).coerceAtLeast(0L)) }
             }
+            .then(
+                if (onPositioned != null) {
+                    Modifier.onGloballyPositioned { coords ->
+                        onPositioned(index, coords.positionInParent().y, coords.size.height.toFloat())
+                    }
+                } else {
+                    Modifier
+                }
+            )
             .padding(vertical = if (isFullScreen) 10.dp else 8.dp),
     ) {
         // Plus de halo floute derriere la ligne active : c'etait le poste le plus
@@ -1149,6 +1170,119 @@ private fun AppleMusicLyricLineItem(
             textAlign = TextAlign.Start,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+/**
+ * Paroles de la carte "en cours de lecture" : **AUCUN defilement**.
+ *
+ * Le bloc n'est pas une liste defilante. Toutes les lignes sont mesurees une
+ * seule fois (onGloballyPositioned), puis le conteneur glisse verticalement
+ * (translationY, un seul calque GPU) pour garder la ligne active a ~42% du
+ * cadre. Deux consequences voulues :
+ *  - le doigt ne peut plus "scroller dans les paroles" : aucun detecteur de
+ *    defilement n'est installe, le geste remonte a la page (c'etait le probleme
+ *    signale : impossible de faire defiler la page quand le doigt tombait sur
+ *    les paroles, et l'auto-scroll se battait avec le doigt) ;
+ *  - l'animation est stable : elle ne depend que du morceau, jamais d'un etat
+ *    de defilement ("browsing") qui faisait clignoter l'effet.
+ *
+ * Un tap n'importe ou ouvre la vue plein ecran (lecture seule ici, pas de saut).
+ */
+@Composable
+private fun InPageSyncedLyrics(
+    positionFlow: Flow<Long>,
+    lyrics: List<LyricsLineData>,
+    offsetMs: Long = 0L,
+    isBlurEnabled: Boolean = true,
+    onOpenFullScreen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val positionMs by positionFlow.collectAsStateWithLifecycle(initialValue = 0L)
+    val isSynced = remember(lyrics) { lyrics.any { it.startMs != null } }
+    val effectivePos = positionMs + offsetMs
+    val activeIndex = remember(effectivePos, isSynced, lyrics) {
+        if (!isSynced) -1 else lyrics.indexOfLast { it.startMs != null && it.startMs <= effectivePos }
+    }
+
+    // Positions mesurees (px, relatives a la colonne) : remplies au premier layout
+    // et seulement si la geometrie change reellement (la translation GPU ne
+    // declenche aucun relayout, donc aucune boucle de mesure).
+    val lineTops = remember(lyrics) { mutableStateMapOf<Int, Float>() }
+    val lineHeights = remember(lyrics) { mutableStateMapOf<Int, Float>() }
+    var viewportPx by remember { mutableFloatStateOf(0f) }
+
+    val targetY = remember(activeIndex, lineTops.toMap(), lineHeights.toMap(), viewportPx) {
+        if (activeIndex < 0 || viewportPx <= 0f) {
+            0f
+        } else {
+            val top = lineTops[activeIndex] ?: 0f
+            val height = lineHeights[activeIndex] ?: 0f
+            (top + height / 2f - viewportPx * 0.42f).coerceAtLeast(0f)
+        }
+    }
+    val animatedY by animateFloatAsState(
+        targetValue = targetY,
+        animationSpec = tween(durationMillis = 620, easing = FastOutSlowInEasing),
+        label = "in_page_lyrics_offset",
+    )
+
+    // Masque haut/bas : une ligne a cheval sur le bord s'estompe au lieu d'etre
+    // coupee net.
+    val fadeMask = remember {
+        Brush.verticalGradient(
+            0.0f to Color.Transparent,
+            0.12f to Color.Black,
+            0.88f to Color.Black,
+            1.0f to Color.Transparent,
+        )
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(300.dp)
+            .clipToBounds()
+            .onSizeChanged { viewportPx = it.height.toFloat() }
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(brush = fadeMask, blendMode = BlendMode.DstIn)
+            }
+            .pointerInput(Unit) { detectTapGestures { onOpenFullScreen() } },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { translationY = -animatedY },
+        ) {
+            lyrics.forEachIndexed { index, line ->
+                AppleMusicLyricLineItem(
+                    line = line,
+                    index = index,
+                    activeIndex = activeIndex,
+                    isSynced = isSynced,
+                    isBrowsing = false,
+                    isFullScreen = false,
+                    isBlurEnabled = isBlurEnabled,
+                    offsetMs = offsetMs,
+                    onSeekTo = {},
+                    onExpand = onOpenFullScreen,
+                    onPositioned = { measuredIndex, top, height ->
+                        lineTops[measuredIndex] = top
+                        lineHeights[measuredIndex] = height
+                    },
+                )
+
+                val nextLine = lyrics.getOrNull(index + 1)
+                val currentMs = line.startMs
+                val nextMs = nextLine?.startMs
+                if (currentMs != null && nextMs != null && (nextMs - currentMs >= 15000L)) {
+                    val isGapActive = isSynced && effectivePos > currentMs + 2000L && effectivePos < nextMs
+                    InstrumentalGapDots(isActive = isGapActive)
+                }
+            }
+        }
     }
 }
 
