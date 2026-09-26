@@ -96,9 +96,12 @@ fun HomeScreen(
     onOpenFavorites: () -> Unit,
     onOpenStats: () -> Unit,
     onOpenAllPlaylists: () -> Unit = {},
+    onOpenNowPlaying: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Stations "radio" du jour (cartes facon Spotify), regenerees chaque jour cote serveur.
+    val radioStations by viewModel.radioStations.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val isOffline = state.isOfflineMode || (!state.serverReachable && state.quickPicks.isEmpty())
     val displayQuickPicks = state.quickPicks
@@ -511,6 +514,32 @@ fun HomeScreen(
                                 playlist = playlist,
                                 onClick = { onOpenPlaylist(playlist.id) },
                                 modifier = Modifier.width(150.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Stations "radio" du jour : cartes facon Spotify, contenu renouvele
+            // chaque jour par le serveur (~/scripts/radio_stations.py).
+            if (radioStations.isNotEmpty()) {
+                item(key = "header_radio") {
+                    SectionHeader("Radio du jour")
+                }
+                item(key = "carousel_radio") {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(radioStations, key = { it.name }, contentType = { "radio_card" }) { station ->
+                            RadioStationCard(
+                                name = station.name,
+                                accent = station.accent,
+                                trackCount = station.size,
+                                onClick = {
+                                    viewModel.playStation(station)
+                                    onOpenNowPlaying()
+                                },
                             )
                         }
                     }

@@ -70,6 +70,7 @@ class HomeViewModel @Inject constructor(
     private val serverUrlRouter: ServerUrlRouter,
     private val playbackController: PlaybackController,
     private val downloadRepository: DownloadRepository,
+    private val radioRepository: RadioRepository,
 ) : ViewModel() {
 
     companion object {
@@ -91,9 +92,14 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(cachedHomeUiState ?: HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    /** Stations "radio" du jour (cartes de l'accueil), regenerees chaque jour cote serveur. */
+    val radioStations: StateFlow<List<RadioStation>> = radioRepository.stations
+
     private var loadJob: Job? = null
 
     init {
+        // Stations du jour : rechargees si elles manquent ou si la date a change.
+        radioRepository.ensureLoaded(viewModelScope)
         viewModelScope.launch {
             combine(
                 serverConfigStore.config,
@@ -145,6 +151,16 @@ class HomeViewModel @Inject constructor(
                 loadOfflineState()
             }
         }
+    }
+
+    /**
+     * Lance une station "radio" du jour : lecture melangee, comme Spotify.
+     * Les titres viennent directement du payload du serveur, aucune requete Subsonic.
+     */
+    fun playStation(station: RadioStation) {
+        val tracks = station.tracks
+        if (tracks.isEmpty()) return
+        playbackController.playShuffled(tracks, playlistId = "radio:${station.name}")
     }
 
     fun load() = loadInternal(force = false)
