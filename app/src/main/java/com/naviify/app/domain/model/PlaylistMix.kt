@@ -168,60 +168,48 @@ fun analyzeHarmonicRelationship(keyA: CamelotKey, keyB: CamelotKey): HarmonicRel
     return HarmonicRelationship.MODULATION
 }
 
-fun getDjBpm(trackId: String, title: String): Int {
-    val hash = kotlin.math.abs(trackId.hashCode() xor title.hashCode())
-    return 84 + (hash % 45) // range 84..128 bpm
-}
+// Les anciens getDjBpm() / getCamelotKey() (un hash transforme en nombre plausible :
+// 84 + hash % 45, et une cle tiree du hash de l'artiste) sont SUPPRIMES.
+// Les valeurs reelles viennent de l'analyseur serveur (DjTrackMeta, cf.
+// DjMetadata.kt) et du tag TBPM remonte par l'API Subsonic : voir realBpmOf()
+// et realCamelotOf(). Un morceau non analyse n'affiche simplement rien.
 
-fun getCamelotKey(trackId: String, artist: String?): CamelotKey {
-    val hash = kotlin.math.abs(trackId.hashCode() * 31 + (artist?.hashCode() ?: 0))
-    val num = (hash % 12) + 1
-    val isMinor = (hash % 3) != 0
-    val letter = if (isMinor) "A" else "B"
-    val code = "$num$letter"
-
-    // Spotify pastel badge colors matching real DJ Mix UI
-    val colorHex = when (num) {
-        1 -> 0xFF4DD0E1 // Cyan / Teal (1A/1B)
-        2 -> 0xFF26A69A // Teal
-        3 -> 0xFFFFD54F // Yellow
-        4 -> 0xFFFFB74D // Gold / Tan / Orange (4A)
-        5 -> 0xFFFF8A65 // Light Orange
-        6 -> 0xFFE57373 // Coral Red
-        7 -> 0xFFF06292 // Rose
-        8 -> 0xFFBA68C8 // Pink / Magenta (8A)
-        9 -> 0xFF9575CD // Purple
-        10 -> 0xFF7986CB // Lavender / Blue (10A)
-        11 -> 0xFF64B5F6 // Sky Blue
-        12 -> 0xFF81C784 // Emerald Green
-        else -> 0xFFFFB74D
-    }
-    return CamelotKey(code = code, colorHex = colorHex, num = num, letter = letter)
-}
-
-fun sortTracksHarmonically(tracks: List<Track>): List<Track> {
+/**
+ * Tri harmonique base sur les valeurs MESUREES (analyseur serveur) : on part du
+ * morceau le plus lent puis on enchaine les cles Camelot les plus proches en
+ * tenant compte de l'ecart de BPM.
+ *
+ * Les morceaux sans metadonnees ne sont plus tries sur un hash : ils sont places
+ * a la fin, dans leur ordre d'origine. Si aucun morceau n'est analyse, la liste
+ * est renvoyee telle quelle.
+ */
+fun sortTracksHarmonically(
+    tracks: List<Track>,
+    meta: Map<String, DjTrackMeta> = emptyMap(),
+): List<Track> {
     if (tracks.size <= 2) return tracks
-    val pool = tracks.toMutableList()
-    val result = mutableListOf<Track>()
+    val analysed = tracks.filter { realBpmOf(it, meta) != null && realCamelotOf(it, meta) != null }
+    val untouched = tracks.filterNot { it in analysed }
+    if (analysed.isEmpty()) return tracks
 
-    // Start with the lowest BPM track as anchor
-    pool.sortBy { getDjBpm(it.id, it.title) }
+    val pool = analysed.sortedBy { realBpmOf(it, meta) ?: 0 }.toMutableList()
+    val result = mutableListOf<Track>()
     var current = pool.removeAt(0)
     result.add(current)
 
     while (pool.isNotEmpty()) {
-        val currentKey = getCamelotKey(current.id, current.artist)
-        val currentBpm = getDjBpm(current.id, current.title)
+        val currentKey = realCamelotOf(current, meta) ?: break
+        val currentBpm = realBpmOf(current, meta) ?: break
 
         var bestIndex = 0
         var minScore = Double.MAX_VALUE
 
         for (i in pool.indices) {
             val candidate = pool[i]
-            val candKey = getCamelotKey(candidate.id, candidate.artist)
-            val candBpm = getDjBpm(candidate.id, candidate.title)
+            val candKey = realCamelotOf(candidate, meta) ?: continue
+            val candBpm = realBpmOf(candidate, meta) ?: continue
 
-            // Camelot step distance
+            // Distance sur la roue Camelot
             val semitoneDist = (candKey.num - currentKey.num + 12) % 12
             val camelotStep = kotlin.math.min(semitoneDist, (12 - semitoneDist) % 12)
             val modePenalty = if (candKey.letter != currentKey.letter) 1.5 else 0.0
@@ -238,6 +226,7 @@ fun sortTracksHarmonically(tracks: List<Track>): List<Track> {
         result.add(current)
     }
 
+    result.addAll(untouched)
     return result
 }
 

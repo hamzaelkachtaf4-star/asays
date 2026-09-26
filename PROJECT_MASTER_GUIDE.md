@@ -349,6 +349,14 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - `PlaylistTransitionBridgeSheet` gained a "Manual timing" card: Reset + two sliders ("Outgoing exit", "Incoming entry") + a weight-based schematic of the placement (no invented waveform).
 - `AutomixBlendPill` replaced: green text on a green border with a hard "from Waiting Around T..." truncation -> full-width card, accent equalizer bars, white "BLENDING n%", marquee title, and a real progress rail fed by the audio blend progress.
 
+### 44. App side: real DJ metadata wired in, hash values deleted
+- `Child.bpm` (OpenSubsonic exposes the TBPM tag) -> `Track.bpm`: the API now carries a real tempo after a Navidrome rescan.
+- New `data/djmeta/DjMetadataRepository` fetches `http://<hote du serveur>:8788/djmeta.json` (systemd user unit `djmeta-http` on the home server; payload keyed by **Navidrome pid == `Track.id`**), caches it in memory and exposes a `StateFlow`. The port is derived from the active server URL (LAN or Tailscale), so no new setting to configure.
+- New domain `DjTrackMeta` + `realBpmOf(track, meta)` / `realCamelotOf(track, meta)` + `camelotFromCode("8A")`.
+- `getDjBpm()` and `getCamelotKey()` (the hash values: `84 + hash % 45`, `-21 bpm`, `Harmonic Warmth (-1)`) are **deleted**. The mix track rows and the Transition Style sheet now show measured values, and render nothing / "Not analysed" when a track is missing from the catalogue.
+- `sortTracksHarmonically(tracks, meta)` sorts on measured BPM/Camelot; unanalysed tracks stay at the end in their original order (never sorted on a hash).
+- Server pipeline behind it: `/home/tayeb/dj-analyzer` (essentia) - 1473 tracks in 27m49s, TBPM/TKEY written into 1487/1487 files, Navidrome rescanned (bpm present for 1487/1487 rows), JSON re-exported (1487 entries, 0 unmatched).
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas

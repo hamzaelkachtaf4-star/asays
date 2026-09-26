@@ -629,7 +629,7 @@ class PlaylistDetailViewModel @Inject constructor(
         val tracks = playlist.tracks
         if (tracks.size <= 2) return
 
-        val sorted = sortTracksHarmonically(tracks)
+        val sorted = sortTracksHarmonically(tracks, djMetadataRepository.meta.value)
 
         val updatedPlaylist = playlist.copy(tracks = sorted)
         _uiState.update {

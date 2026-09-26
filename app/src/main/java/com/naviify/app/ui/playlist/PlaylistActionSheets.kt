@@ -61,8 +61,9 @@ import com.naviify.app.domain.model.PlaylistMixMode
 import com.naviify.app.domain.model.CamelotKey
 import com.naviify.app.domain.model.HarmonicRelationship
 import com.naviify.app.domain.model.analyzeHarmonicRelationship
-import com.naviify.app.domain.model.getCamelotKey
-import com.naviify.app.domain.model.getDjBpm
+import com.naviify.app.domain.model.DjTrackMeta
+import com.naviify.app.domain.model.realBpmOf
+import com.naviify.app.domain.model.realCamelotOf
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -1882,15 +1883,22 @@ fun PlaylistTransitionBridgeSheet(
     outroOffsetMs: Long = 0L,
     introSkipMs: Long = 0L,
     onTimingChange: (Long, Long) -> Unit = { _, _ -> },
+    /** BPM + Camelot mesures (analyseur serveur), cle = Track.id. */
+    djMeta: Map<String, DjTrackMeta> = emptyMap(),
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val camelotA = getCamelotKey(fromTrack.id, fromTrack.artist)
-    val camelotB = getCamelotKey(toTrack.id, toTrack.artist)
-    val bpmA = getDjBpm(fromTrack.id, fromTrack.title)
-    val bpmB = getDjBpm(toTrack.id, toTrack.title)
-    val bpmDiff = bpmB - bpmA
-    val harmony = analyzeHarmonicRelationship(camelotA, camelotB)
+    // Valeurs MESUREES uniquement (analyseur serveur) : plus rien n'est fabrique.
+    val camelotA = realCamelotOf(fromTrack, djMeta)
+    val camelotB = realCamelotOf(toTrack, djMeta)
+    val bpmA = realBpmOf(fromTrack, djMeta)
+    val bpmB = realBpmOf(toTrack, djMeta)
+    val bpmDiff = if (bpmA != null && bpmB != null) bpmB - bpmA else null
+    val harmony = if (camelotA != null && camelotB != null) {
+        analyzeHarmonicRelationship(camelotA, camelotB)
+    } else {
+        null
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1996,23 +2004,34 @@ fun PlaylistTransitionBridgeSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = Color(camelotA.colorHex),
-                                ) {
+                                camelotA?.let { key ->
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(key.colorHex),
+                                    ) {
+                                        Text(
+                                            text = key.code,
+                                            color = Color.Black,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                        )
+                                    }
+                                }
+                                if (bpmA != null) {
                                     Text(
-                                        text = camelotA.code,
-                                        color = Color.Black,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                        text = "$bpmA bpm",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary,
                                     )
                                 }
-                                Text(
-                                    text = "$bpmA bpm",
-                                    fontSize = 11.sp,
-                                    color = TextSecondary,
-                                )
+                                if (camelotA == null && bpmA == null) {
+                                    Text(
+                                        text = "Not analysed",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary,
+                                    )
+                                }
                             }
                         }
 
@@ -2037,10 +2056,15 @@ fun PlaylistTransitionBridgeSheet(
                             }
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                text = if (bpmDiff > 0) "+$bpmDiff bpm" else if (bpmDiff < 0) "$bpmDiff bpm" else "Sync bpm",
+                                text = when {
+                                    bpmDiff == null -> "—"
+                                    bpmDiff > 0 -> "+$bpmDiff bpm"
+                                    bpmDiff < 0 -> "$bpmDiff bpm"
+                                    else -> "Sync bpm"
+                                },
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (kotlin.math.abs(bpmDiff) <= 4) SpotifyGreen else TextSecondary,
+                                color = if (bpmDiff != null && kotlin.math.abs(bpmDiff) <= 4) SpotifyGreen else TextSecondary,
                             )
                         }
 
@@ -2077,23 +2101,34 @@ fun PlaylistTransitionBridgeSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = Color(camelotB.colorHex),
-                                ) {
+                                camelotB?.let { key ->
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(key.colorHex),
+                                    ) {
+                                        Text(
+                                            text = key.code,
+                                            color = Color.Black,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                        )
+                                    }
+                                }
+                                if (bpmB != null) {
                                     Text(
-                                        text = camelotB.code,
-                                        color = Color.Black,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                        text = "$bpmB bpm",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary,
                                     )
                                 }
-                                Text(
-                                    text = "$bpmB bpm",
-                                    fontSize = 11.sp,
-                                    color = TextSecondary,
-                                )
+                                if (camelotB == null && bpmB == null) {
+                                    Text(
+                                        text = "Not analysed",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary,
+                                    )
+                                }
                             }
                         }
                     }
@@ -2102,38 +2137,40 @@ fun PlaylistTransitionBridgeSheet(
                     HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
                     Spacer(Modifier.height(10.dp))
 
-                    // Harmonic relationship badge
-                    Surface(
-                        color = Color(harmony.colorHex).copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Color(harmony.colorHex).copy(alpha = 0.25f)),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                    // Relation harmonique : affichee seulement si les DEUX cles sont mesurees.
+                    harmony?.let { rel ->
+                        Surface(
+                            color = Color(rel.colorHex).copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Color(rel.colorHex).copy(alpha = 0.25f)),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Box(
+                            Row(
                                 modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(harmony.colorHex)),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = harmony.label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(harmony.colorHex),
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(rel.colorHex)),
                                 )
-                                Text(
-                                    text = harmony.description,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                    color = TextSecondary,
-                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = rel.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(rel.colorHex),
+                                    )
+                                    Text(
+                                        text = rel.description,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = TextSecondary,
+                                    )
+                                }
                             }
                         }
                     }
