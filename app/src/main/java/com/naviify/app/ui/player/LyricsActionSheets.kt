@@ -222,7 +222,33 @@ fun LyricsOptionsSheet(
                 Spacer(Modifier.height(10.dp))
             }
 
+            // Glow / blur effect toggle — crisp mode removes the blur pipeline entirely
+            LyricsToggleRow(
+                icon = Icons.Rounded.AutoAwesome,
+                title = "Lyrics Glow Effect",
+                subtitle = if (isBlurEnabled) {
+                    "Soft halo behind the active line — turn off if scrolling stutters"
+                } else {
+                    "Crisp mode: high-contrast text, no blur pipeline"
+                },
+                checked = isBlurEnabled,
+                onCheckedChange = onToggleBlur,
+            )
+
+            Spacer(Modifier.height(6.dp))
+
             // Menu actions
+            LyricsMenuItem(
+                icon = Icons.Rounded.Share,
+                title = "Share Lyrics",
+                subtitle = "Share the full lyrics text of this track",
+                tint = SpotifyGreen,
+                onClick = {
+                    onDismiss()
+                    onShareLyrics()
+                },
+            )
+
             LyricsMenuItem(
                 icon = Icons.Rounded.Search,
                 title = "Search & Change Lyrics",
@@ -360,6 +386,62 @@ private fun LyricsMenuItem(
                 color = TextSecondary,
             )
         }
+    }
+}
+
+@Composable
+private fun LyricsToggleRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(SurfaceCard),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (checked) SpotifyGreen else TextSecondary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = SpotifyGreen,
+                uncheckedThumbColor = Color.White.copy(alpha = 0.6f),
+                uncheckedTrackColor = Color.White.copy(alpha = 0.15f),
+            ),
+        )
     }
 }
 
