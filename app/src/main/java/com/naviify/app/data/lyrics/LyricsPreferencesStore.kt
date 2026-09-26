@@ -41,6 +41,19 @@ class LyricsPreferencesStore @Inject constructor(
     private val _reportedTracks = MutableStateFlow<List<ReportedTrack>>(loadReportedTracks())
     val reportedTracks: StateFlow<List<ReportedTrack>> = _reportedTracks.asStateFlow()
 
+    /**
+     * Glow / blur halo behind the active lyric line.
+     * Enabled by default; can be turned off on devices where the blur pipeline
+     * causes frame drops (crisp mode relies on opacity contrast instead).
+     */
+    private val _lyricsBlurEnabled = MutableStateFlow(prefs.getBoolean(KEY_BLUR_ENABLED, true))
+    val lyricsBlurEnabled: StateFlow<Boolean> = _lyricsBlurEnabled.asStateFlow()
+
+    fun setLyricsBlurEnabled(enabled: Boolean) {
+        _lyricsBlurEnabled.value = enabled
+        prefs.edit().putBoolean(KEY_BLUR_ENABLED, enabled).apply()
+    }
+
     fun isBlocked(trackId: String): Boolean =
         _blockedTrackIds.value.contains(trackId)
 
@@ -113,5 +126,6 @@ class LyricsPreferencesStore @Inject constructor(
     companion object {
         private const val KEY_BLOCKED_IDS = "blocked_lyrics_track_ids"
         private const val KEY_REPORTED_TRACKS = "reported_lyrics_tracks"
+        private const val KEY_BLUR_ENABLED = "lyrics_blur_enabled"
     }
 }

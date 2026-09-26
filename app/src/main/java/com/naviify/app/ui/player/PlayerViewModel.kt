@@ -112,6 +112,11 @@ class PlayerViewModel @Inject constructor(
     val sleepTimerRemainingSeconds: StateFlow<Long?> = playbackController.sleepTimerRemainingSeconds
     val isSleepUntilTrackEnd: StateFlow<Boolean> = playbackController.isSleepUntilTrackEnd
 
+    /** Glow / blur halo on the active lyric line — persisted in LyricsPreferencesStore. */
+    val lyricsBlurEnabled: StateFlow<Boolean> = lyricsPreferencesStore.lyricsBlurEnabled
+
+    fun setLyricsBlurEnabled(enabled: Boolean) = lyricsPreferencesStore.setLyricsBlurEnabled(enabled)
+
     fun startSleepTimer(minutes: Int) = playbackController.startSleepTimer(minutes.coerceIn(1, 120))
 
     fun startSleepUntilEndOfTrack() = playbackController.startSleepTimerEndOfTrack()

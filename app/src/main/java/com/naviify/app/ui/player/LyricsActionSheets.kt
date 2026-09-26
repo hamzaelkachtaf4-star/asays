@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
@@ -50,6 +51,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -85,6 +88,7 @@ fun LyricsOptionsSheet(
     hasLyrics: Boolean,
     currentOffsetMs: Long,
     isCustomLyrics: Boolean = false,
+    isBlurEnabled: Boolean = true,
     onAdjustTiming: () -> Unit,
     onQuickOffset: (Long) -> Unit,
     onSearchManual: () -> Unit,
@@ -92,6 +96,8 @@ fun LyricsOptionsSheet(
     onResetCustomLyrics: () -> Unit = {},
     onCopyLrc: () -> Unit = {},
     onShareLrc: () -> Unit = {},
+    onShareLyrics: () -> Unit = {},
+    onToggleBlur: (Boolean) -> Unit = {},
     onBlockLyrics: () -> Unit,
     onReportLyrics: () -> Unit,
     onDismiss: () -> Unit,
