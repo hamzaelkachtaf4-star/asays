@@ -375,6 +375,15 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - Plein ecran : la ligne active garde **toujours** alpha 1.0 + scale 1.05, meme en mode "browsing" (avant, le browsing passait toutes les lignes a 0.82 : en tapant une ligne, l'effet semblait disparaitre).
 - Regle a retenir : un bloc de paroles dans une page defilante ne doit JAMAIS contenir de liste defilante.
 
+### 47. Stations "radio" du jour (remplace les playlists de genre Navidrome)
+- Tayeb ne veut plus ces genres sous forme de playlists Navidrome : elles doivent apparaitre **dans l'app** comme des cartes "radio" facon Spotify, et le contenu doit changer chaque jour.
+- `~/scripts/radio_stations.py` produit `~/dj-analyzer/radio.json` : 6 stations (Rap Maghribi, Raï, Rap US, Rap Russe, Rock, Country) et, pour chaque titre, `id / titre / artiste / album / album_id / duree / bpm / camelot` - l'app peut donc afficher ET jouer sans aucun appel supplementaire.
+- Rotation quotidienne : melange amorce par la date du jour + echantillon de 60 titres max par station (le contenu change chaque jour, reste stable dans la journee, JSON de 37 Ko).
+- `djmeta_server.py` sert aussi `/radio.json` (port 8788, LAN + Tailscale). Le timer user `genre-playlists.timer` regenere le JSON chaque jour a 00:05.
+- Les `.m3u8` de genre ont ete retires du disque **et** de la base Navidrome : il ne reste que les listes de Tayeb (My own, Raï 746, Best American Rap 539, 1, L7ajaa, Fuck off).
+- Reste a faire cote app : section "Radio" sur l'accueil (cartes facon Spotify) + ecran de station + lecture.
+- Perf associee (commit `bcb918e`) : le fond flou du lecteur est calcule sur un calque de 128dp agrandi 6x au lieu d'un `blur(60.dp)` plein ecran, et les paroles de la carte ne composent qu'une fenetre de 14 lignes (composer 100+ lignes creait ~200 animations a l'ouverture).
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
