@@ -655,7 +655,17 @@ fun NowPlayingScreen(
 @Composable
 private fun BlurredBackdrop(coverArtId: String?, modifier: Modifier = Modifier) {
     if (coverArtId.isNullOrBlank()) return
-    Box(modifier = modifier.fillMaxSize()) {
+    // Cout GPU : le flou est calcule sur un PETIT calque (128dp) qui est ensuite
+    // agrandi 6x. Le rendu final est un lavis flou equivalent a un flou plein
+    // ecran, mais le RenderEffect ne traite que ~128x128 px au lieu de toute la
+    // surface. C'est l'ancien `blur(60.dp)` plein ecran qui rendait l'ouverture
+    // du lecteur lourde (surtout en arrivant depuis la recherche).
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clipToBounds(),
+        contentAlignment = Alignment.Center,
+    ) {
         Crossfade(
             targetState = coverArtId,
             animationSpec = tween(700, easing = FastOutSlowInEasing),
@@ -665,8 +675,12 @@ private fun BlurredBackdrop(coverArtId: String?, modifier: Modifier = Modifier) 
                 coverArtId = currentCoverId,
                 size = 256,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .blur(60.dp)
+                    .size(128.dp)
+                    .blur(14.dp)
+                    .graphicsLayer {
+                        scaleX = 6f
+                        scaleY = 6f
+                    }
                     .alpha(0.30f),
             )
         }
@@ -1229,6 +1243,15 @@ private fun InPageSyncedLyrics(
 
     // Masque haut/bas : une ligne a cheval sur le bord s'estompe au lieu d'etre
     // coupee net.
+    // Fenetre de lignes : on ne compose QUE les lignes autour de la ligne active.
+    // Composer les 100+ lignes d'un morceau d'un coup creait 2 animations par
+    // ligne (~200 Animatable) a l'ouverture du lecteur : c'etait lourd.
+    val windowSize = 14
+    val windowStart = (activeIndex - 5).coerceAtLeast(0)
+    val windowEnd = (windowStart + windowSize).coerceAtMost(lyrics.size)
+    val firstVisible = (windowEnd - windowSize).coerceAtLeast(0)
+    val visibleLines = remember(lyrics, firstVisible, windowEnd) { lyrics.subList(firstVisible, windowEnd) }
+
     val fadeMask = remember {
         Brush.verticalGradient(
             0.0f to Color.Transparent,
@@ -1256,7 +1279,8 @@ private fun InPageSyncedLyrics(
                 .fillMaxWidth()
                 .graphicsLayer { translationY = -animatedY },
         ) {
-            lyrics.forEachIndexed { index, line ->
+            visibleLines.forEachIndexed { localIndex, line ->
+                val index = firstVisible + localIndex
                 AppleMusicLyricLineItem(
                     line = line,
                     index = index,
