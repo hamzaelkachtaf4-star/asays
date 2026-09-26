@@ -181,6 +181,7 @@ fun MainShell(
                             lastTab = Routes.PLAYLISTS
                             navigateToTab(navController, Routes.PLAYLISTS)
                         },
+                        onOpenNowPlaying = { navController.navigate(Routes.NOW_PLAYING) },
                     )
                 }
                 composable(Routes.SEARCH) {

@@ -760,3 +760,78 @@ private fun AppleMusicHeroCard(
         }
     }
 }
+
+/**
+ * Carte d'une station "radio" du jour (facon Spotify) : tuile degradee batie sur
+ * la couleur d'accent envoyee par le serveur, nom de la station et nombre de
+ * titres. Aucune image distante, donc rien a telecharger pour afficher l'accueil.
+ */
+@Composable
+private fun RadioStationCard(
+    name: String,
+    accent: String,
+    trackCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Zero-SDK rule : aucune valeur @Composable (SpotifyGreen, TextPrimary...) ici,
+    // tout est calculé avant la composition (remember + couleurs brutes).
+    val accentColor = remember(accent) { parseAccentColor(accent) }
+    val brush = remember(accentColor) {
+        Brush.linearGradient(
+            listOf(
+                accentColor,
+                accentColor.copy(alpha = 0.45f),
+                Color(0xFF161616),
+            ),
+        )
+    }
+    Surface(
+        color = Color(0xFF1C1C1C),
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .width(152.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .background(brush),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.92f),
+                    modifier = Modifier.size(34.dp),
+                )
+            }
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "$trackCount titres",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                    color = Color.White.copy(alpha = 0.65f),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+/** "#RRGGBB" -> Color. Retourne l'accent du theme si la valeur est illisible. */
+private fun parseAccentColor(hex: String): Color {
+    val clean = hex.trim().removePrefix("#")
+    return runCatching {
+        if (clean.length == 6) Color(0xFF000000L or clean.toLong(16)) else Color(0xFFFA2D48)
+    }.getOrDefault(Color(0xFFFA2D48))
+}

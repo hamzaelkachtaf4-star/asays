@@ -389,6 +389,13 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - Resultat du 26/09 : **aucun probleme bloquant** ; les 24 signalements sont des faux positifs connus : `BuildConfig`/`R` (generes par Gradle), `FilterChip` (stable dans la Material3 courante), fonctions membres de classes (le parseur ne voit que le top-level), et des chaines brutes multi-lignes qui faussent le comptage de parentheses dans des fichiers qui compilent (ServerUrl.kt). Aucun des fichiers modifies recemment (NowPlayingScreen, PlaylistActionSheets, PlaylistDetail*, HomeScreen, PlaylistMix*, DjMetadata*) n'est signale.
 - Limite : pas de type-checking reel (pas de JDK/Gradle ici) - le verdict final reste `./gradlew assemblePerf` sur le Mac.
 
+### 49. Accueil : cartes "Radio du jour" (cote app)
+- Nouveaux fichiers : `core/network/dto/RadioDtos.kt` (payload de `/radio.json`), `domain/model/RadioStation.kt` (nom + accent + titres deja en `Track`), `data/radio/RadioRepository.kt`.
+- `RadioRepository` : `@Singleton`, meme logique d'endpoint que `DjMetadataRepository` (hote du serveur actif + port 8788, client OkHttp dedie, **pas** l'intercepteur Subsonic). Il recharge des que la date du payload change -> les cartes suivent la rotation quotidienne du serveur sans action de l'utilisateur.
+- `HomeViewModel` : injecte le repository, expose `radioStations`, et `playStation(station)` appelle `playbackController.playShuffled(tracks, "radio:<nom>")`. Les titres arrivent complets du serveur (id/titre/artiste/album/album_id/duree/bpm) : **aucun appel Subsonic supplementaire**.
+- `HomeScreen` : section "Radio du jour" (LazyRow de cartes facon Spotify - tuile degradee batie sur la couleur d'accent envoyee par le serveur, nom + nombre de titres, aucune image distante). Tap = lance la station en lecture melangee puis ouvre le lecteur (`onOpenNowPlaying`, cable dans `MainShell`).
+- Contrat verifie automatiquement : les champs du JSON serveur correspondent exactement aux DTO (racine / station / titre).
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
