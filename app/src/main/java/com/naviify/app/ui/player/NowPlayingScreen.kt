@@ -1120,6 +1120,13 @@ private fun AppleMusicLyricLineItem(
     val targetAlpha = when {
         !isSynced -> 0.88f
         isActive -> 1.0f
+        activeIndex < 0 -> when (index) {
+            0 -> 0.94f
+            1 -> 0.76f
+            2 -> 0.60f
+            3 -> 0.48f
+            else -> 0.38f
+        }
         !isBlurEnabled -> 0.48f
         isBrowsing -> 0.80f
         distance == 1 -> 0.74f
@@ -1144,8 +1151,18 @@ private fun AppleMusicLyricLineItem(
     val fontSize = if (isFullScreen) 30.sp else 26.sp
     val lineHeight = if (isFullScreen) 38.sp else 34.sp
 
-    val lineBlur = if (isBlurEnabled && !isActive && isSynced && distance >= 1) {
-        (distance * 1.2f).coerceAtMost(3f).dp
+    val lineBlur = if (isBlurEnabled && !isActive && isSynced) {
+        if (activeIndex < 0) {
+            when (index) {
+                0, 1 -> 0.dp
+                2 -> 1.dp
+                else -> 2.dp
+            }
+        } else if (distance >= 1) {
+            (distance * 1.2f).coerceAtMost(3f).dp
+        } else {
+            0.dp
+        }
     } else {
         0.dp
     }
@@ -1202,19 +1219,18 @@ private fun AppleMusicLyricLineItem(
 }
 
 /**
- * Paroles de la carte "en cours de lecture" : **AUCUN defilement**.
+ * Paroles de la carte "en cours de lecture" : Defilement continu fluide et centre.
  *
- * Le bloc n'est ni une liste defilante ni un conteneur decale : il n'affiche que
- * la ligne active, la precedente (contexte) et les 3 suivantes, et le bloc entier
- * est remplace par un fondu a chaque changement de ligne. Consequences voulues :
- *  - aucune mesure de hauteur ni offset anime -> rien a recaler, donc plus de
- *    ligne coupee au bord, plus d'etat casse en revenant du plein ecran ;
- *  - le doigt ne peut pas "scroller dans les paroles" : aucun detecteur de
- *    defilement, le geste remonte a la page ;
- *  - trois `Text` par bloc au lieu de 14 lignes animees : l'ouverture du lecteur
- *    ne compose plus qu'une poignee de vues.
+ * Toutes les lignes sont rendues dans une colonne animee par translation GPU
+ * (translationY, un seul calque GPU) pour garder la ligne active au centre-haut
+ * (~35% du cadre).
  *
- * Un tap n'importe ou ouvre la vue plein ecran (lecture seule ici, pas de saut).
+ * Avantages :
+ *  - Animation parfaitement fluide sans re-layout ni a-coups (glide continu) ;
+ *  - Aucune zone vide en bas : toutes les lignes suivantes remplissent la carte ;
+ *  - En intro (activeIndex < 0) : les premieres lignes s'affichent proprement des le haut ;
+ *  - Aucun geste de defilement interne n'interfere avec la page principale ;
+ *  - Un tap n'importe ou ouvre la vue plein ecran.
  */
 @Composable
 private fun InPageSyncedLyrics(
@@ -1232,11 +1248,36 @@ private fun InPageSyncedLyrics(
         if (!isSynced) -1 else lyrics.indexOfLast { it.startMs != null && it.startMs <= effectivePos }
     }
 
-    val upcomingAlpha = if (isBlurEnabled) 0.58f else 0.72f
-    val fadeMask = remember {
+    val lineTops = remember(lyrics) { mutableStateMapOf<Int, Float>() }
+    val lineHeights = remember(lyrics) { mutableStateMapOf<Int, Float>() }
+    var viewportPx by remember { mutableFloatStateOf(0f) }
+    var columnHeightPx by remember { mutableFloatStateOf(0f) }
+
+    val targetY = remember(activeIndex, lineTops.toMap(), lineHeights.toMap(), viewportPx, columnHeightPx) {
+        if (activeIndex < 0 || viewportPx <= 0f) {
+            0f
+        } else {
+            val top = lineTops[activeIndex] ?: 0f
+            val height = lineHeights[activeIndex] ?: 0f
+            val desired = top + height / 2f - viewportPx * 0.35f
+            val maxScroll = (columnHeightPx - viewportPx + 24f).coerceAtLeast(0f)
+            desired.coerceIn(0f, maxScroll)
+        }
+    }
+
+    val animatedY by animateFloatAsState(
+        targetValue = targetY,
+        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+        label = "in_page_lyrics_offset",
+    )
+
+    // Masque de fondu : la ligne du haut s'estompe uniquement une fois que la liste a commence a defiler
+    val topFadeFactor = (animatedY / 40f).coerceIn(0f, 1f)
+    val fadeMask = remember(topFadeFactor) {
         Brush.verticalGradient(
-            0.0f to Color.Black,
-            0.84f to Color.Black,
+            0.0f to Color.Black.copy(alpha = 1f - topFadeFactor),
+            0.12f to Color.Black,
+            0.88f to Color.Black,
             1.0f to Color.Transparent,
         )
     }
@@ -1244,8 +1285,9 @@ private fun InPageSyncedLyrics(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(240.dp)
+            .height(260.dp)
             .clipToBounds()
+            .onSizeChanged { viewportPx = it.height.toFloat() }
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
                 drawContent()
@@ -1254,149 +1296,36 @@ private fun InPageSyncedLyrics(
             .pointerInput(Unit) { detectTapGestures { onOpenFullScreen() } },
         contentAlignment = Alignment.TopStart,
     ) {
-        if (!isSynced) {
-            // Paroles non synchronisees : affichage propre et lisible
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-            ) {
-                lyrics.take(6).forEachIndexed { index, line ->
-                    Text(
-                        text = line.text,
-                        fontSize = if (index == 0) 24.sp else 20.sp,
-                        lineHeight = if (index == 0) 32.sp else 27.sp,
-                        fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal,
-                        color = Color.White.copy(alpha = if (index == 0) 0.95f else 0.65f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(bottom = if (index == 0) 10.dp else 6.dp),
-                    )
-                }
-            }
-        } else if (activeIndex < 0) {
-            // Intro : avant le debut du premier vers, afficher les 5 premieres lignes clairement
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-            ) {
-                lyrics.take(5).forEachIndexed { lineIdx, line ->
-                    Text(
-                        text = line.text,
-                        fontSize = if (lineIdx == 0) 24.sp else 21.sp,
-                        lineHeight = if (lineIdx == 0) 32.sp else 28.sp,
-                        fontWeight = if (lineIdx == 0) FontWeight.Bold else FontWeight.SemiBold,
-                        color = Color.White.copy(alpha = (0.92f - lineIdx * 0.15f).coerceAtLeast(0.28f)),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .padding(bottom = 6.dp)
-                            .then(
-                                if (isBlurEnabled && lineIdx >= 2) {
-                                    Modifier.blur(((lineIdx - 1) * 0.8f).coerceAtMost(2.0f).dp)
-                                } else Modifier
-                            ),
-                    )
-                }
-            }
-        } else {
-            AnimatedContent(
-                targetState = activeIndex,
-                transitionSpec = {
-                    (
-                        fadeIn(animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing)) +
-                            slideInVertically(
-                                animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
-                                initialOffsetY = { fullHeight -> fullHeight / 8 },
-                            )
-                        ).togetherWith(
-                        fadeOut(animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)),
-                    )
-                },
-                label = "in_page_lyrics_block",
-            ) { index ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                ) {
-                    val hasPrevious = index > 0 && lyrics.getOrNull(index - 1) != null
-                    if (hasPrevious) {
-                        val previous = lyrics[index - 1]
-                        Text(
-                            text = previous.text,
-                            fontSize = 20.sp,
-                            lineHeight = 26.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White.copy(alpha = 0.45f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .padding(bottom = 8.dp)
-                                .then(if (isBlurEnabled) Modifier.blur(1.5.dp) else Modifier),
-                        )
-                    }
-                    lyrics.getOrNull(index)?.let { current ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 10.dp),
-                        ) {
-                            if (isBlurEnabled) {
-                                Text(
-                                    text = current.text,
-                                    fontSize = 26.sp,
-                                    lineHeight = 34.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .graphicsLayer { alpha = 0.45f }
-                                        .blur(8.dp, BlurredEdgeTreatment.Unbounded),
-                                )
-                            }
-                            Text(
-                                text = current.text,
-                                fontSize = 26.sp,
-                                lineHeight = 34.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-                    // Interlude instrumental long (>= 20s) : trois points discrets
-                    val currentMs = lyrics.getOrNull(index)?.startMs
-                    val nextMs = lyrics.getOrNull(index + 1)?.startMs
-                    if (currentMs != null && nextMs != null && (nextMs - currentMs) >= 20000L &&
-                        effectivePos > currentMs + 2000L && effectivePos < nextMs
-                    ) {
-                        InstrumentalGapDots(isActive = true)
-                    }
-                    // Affiche 4 lignes suivantes si pas de precedente, sinon 3 pour garder la carte pleine
-                    val upcomingCount = if (hasPrevious) 3 else 4
-                    for (step in 1..upcomingCount) {
-                        lyrics.getOrNull(index + step)?.let { upcomingLine ->
-                            val stepBlur = if (isBlurEnabled) (step * 0.9f).coerceAtMost(2.2f).dp else 0.dp
-                            Text(
-                                text = upcomingLine.text,
-                                fontSize = 21.sp,
-                                lineHeight = 28.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White.copy(alpha = (upcomingAlpha - 0.10f * step).coerceAtLeast(0.25f)),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .padding(bottom = 6.dp)
-                                    .then(if (stepBlur > 0.dp) Modifier.blur(stepBlur) else Modifier),
-                            )
-                        }
-                    }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { columnHeightPx = it.height.toFloat() }
+                .graphicsLayer { translationY = -animatedY },
+        ) {
+            lyrics.forEachIndexed { index, line ->
+                AppleMusicLyricLineItem(
+                    line = line,
+                    index = index,
+                    activeIndex = activeIndex,
+                    isSynced = isSynced,
+                    isBrowsing = false,
+                    isFullScreen = false,
+                    isBlurEnabled = isBlurEnabled,
+                    offsetMs = offsetMs,
+                    onSeekTo = {},
+                    onExpand = onOpenFullScreen,
+                    onPositioned = { measuredIndex, top, height ->
+                        lineTops[measuredIndex] = top
+                        lineHeights[measuredIndex] = height
+                    },
+                )
+
+                val nextLine = lyrics.getOrNull(index + 1)
+                val currentMs = line.startMs
+                val nextMs = nextLine?.startMs
+                if (currentMs != null && nextMs != null && (nextMs - currentMs >= 20000L)) {
+                    val isGapActive = isSynced && effectivePos > currentMs + 2000L && effectivePos < nextMs
+                    InstrumentalGapDots(isActive = isGapActive)
                 }
             }
         }
