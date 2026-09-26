@@ -1127,25 +1127,16 @@ private fun AppleMusicLyricLineItem(
         else -> 0.50f
     }
 
-    val targetScale = when {
-        !isSynced -> 1.0f
-        isActive -> 1.05f
-        isBrowsing -> 1.0f
-        distance == 1 -> 0.98f
-        else -> 0.95f
-    }
+    val targetScale = if (isActive && !isBrowsing) 1.04f else 1.0f
 
     val animatedScale by animateFloatAsState(
         targetValue = targetScale,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessLow,
-        ),
+        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
         label = "lyric_scale_$index",
     )
     val animatedAlpha by animateFloatAsState(
         targetValue = targetAlpha,
-        animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
         label = "lyric_alpha_$index",
     )
 
@@ -1200,7 +1191,7 @@ private fun AppleMusicLyricLineItem(
             text = line.text,
             fontSize = fontSize,
             lineHeight = lineHeight,
-            fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
             color = Color.White.copy(alpha = animatedAlpha),
             textAlign = TextAlign.Start,
             modifier = Modifier
@@ -1242,12 +1233,24 @@ private fun InPageSyncedLyrics(
     }
 
     val upcomingAlpha = if (isBlurEnabled) 0.58f else 0.72f
+    val fadeMask = remember {
+        Brush.verticalGradient(
+            0.0f to Color.Black,
+            0.84f to Color.Black,
+            1.0f to Color.Transparent,
+        )
+    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(250.dp)
+            .height(240.dp)
             .clipToBounds()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(brush = fadeMask, blendMode = BlendMode.DstIn)
+            }
             .pointerInput(Unit) { detectTapGestures { onOpenFullScreen() } },
         contentAlignment = Alignment.TopStart,
     ) {
@@ -1271,6 +1274,32 @@ private fun InPageSyncedLyrics(
                     )
                 }
             }
+        } else if (activeIndex < 0) {
+            // Intro : avant le debut du premier vers, afficher les 5 premieres lignes clairement
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+            ) {
+                lyrics.take(5).forEachIndexed { lineIdx, line ->
+                    Text(
+                        text = line.text,
+                        fontSize = if (lineIdx == 0) 24.sp else 21.sp,
+                        lineHeight = if (lineIdx == 0) 32.sp else 28.sp,
+                        fontWeight = if (lineIdx == 0) FontWeight.Bold else FontWeight.SemiBold,
+                        color = Color.White.copy(alpha = (0.92f - lineIdx * 0.15f).coerceAtLeast(0.28f)),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(bottom = 6.dp)
+                            .then(
+                                if (isBlurEnabled && lineIdx >= 2) {
+                                    Modifier.blur(((lineIdx - 1) * 0.8f).coerceAtMost(2.0f).dp)
+                                } else Modifier
+                            ),
+                    )
+                }
+            }
         } else {
             AnimatedContent(
                 targetState = activeIndex,
@@ -1278,8 +1307,8 @@ private fun InPageSyncedLyrics(
                     (
                         fadeIn(animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing)) +
                             slideInVertically(
-                                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-                                initialOffsetY = { fullHeight -> fullHeight / 6 },
+                                animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+                                initialOffsetY = { fullHeight -> fullHeight / 8 },
                             )
                         ).togetherWith(
                         fadeOut(animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)),
@@ -1292,7 +1321,9 @@ private fun InPageSyncedLyrics(
                         .fillMaxWidth()
                         .padding(top = 4.dp),
                 ) {
-                    lyrics.getOrNull(index - 1)?.let { previous ->
+                    val hasPrevious = index > 0 && lyrics.getOrNull(index - 1) != null
+                    if (hasPrevious) {
+                        val previous = lyrics[index - 1]
                         Text(
                             text = previous.text,
                             fontSize = 20.sp,
@@ -1302,7 +1333,7 @@ private fun InPageSyncedLyrics(
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
-                                .padding(bottom = 10.dp)
+                                .padding(bottom = 8.dp)
                                 .then(if (isBlurEnabled) Modifier.blur(1.5.dp) else Modifier),
                         )
                     }
@@ -1310,7 +1341,7 @@ private fun InPageSyncedLyrics(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 12.dp),
+                                .padding(bottom = 10.dp),
                         ) {
                             if (isBlurEnabled) {
                                 Text(
@@ -1347,9 +1378,11 @@ private fun InPageSyncedLyrics(
                     ) {
                         InstrumentalGapDots(isActive = true)
                     }
-                    for (step in 1..3) {
+                    // Affiche 4 lignes suivantes si pas de precedente, sinon 3 pour garder la carte pleine
+                    val upcomingCount = if (hasPrevious) 3 else 4
+                    for (step in 1..upcomingCount) {
                         lyrics.getOrNull(index + step)?.let { upcomingLine ->
-                            val stepBlur = if (isBlurEnabled) (step * 1.0f).coerceAtMost(2.5f).dp else 0.dp
+                            val stepBlur = if (isBlurEnabled) (step * 0.9f).coerceAtMost(2.2f).dp else 0.dp
                             Text(
                                 text = upcomingLine.text,
                                 fontSize = 21.sp,
@@ -1394,9 +1427,6 @@ private fun SyncedLyricsList(
     var isAutoScrolling by remember { mutableStateOf(false) }
     val isBrowsing = listState.isScrollInProgress || userScrolledRecently
 
-    // Un defilement programme (auto-sync) ne doit JAMAIS passer pour un geste
-    // utilisateur : sinon l'auto-scroll s'auto-annulait en boucle (les paroles
-    // decrochaient du morceau et les animations s'empilaient).
     LaunchedEffect(listState.isScrollInProgress, isAutoScrolling) {
         if (listState.isScrollInProgress && !isAutoScrolling) {
             userScrolledRecently = true
@@ -1408,9 +1438,7 @@ private fun SyncedLyricsList(
 
     LaunchedEffect(activeIndex, userScrolledRecently) {
         if (isSynced && !userScrolledRecently && activeIndex >= 0 && activeIndex in lyrics.indices) {
-            // Deux lignes au-dessus de l'active : elle reste dans le haut du cadre,
-            // la ligne suivante reste visible (meme logique que le plein ecran).
-            val target = (activeIndex - 2).coerceAtLeast(0)
+            val target = (activeIndex - 1).coerceAtLeast(0)
             if (listState.firstVisibleItemIndex != target) {
                 isAutoScrolling = true
                 try {
@@ -1422,13 +1450,11 @@ private fun SyncedLyricsList(
         }
     }
 
-    // Masque de fondu haut/bas : une ligne a cheval sur le bord s'estompe au lieu
-    // d'etre coupee en deux (c'etait le "la premiere ligne est tranchee").
     val fadeMask = remember(isFullScreen) {
         Brush.verticalGradient(
             0.0f to Color.Transparent,
-            (if (isFullScreen) 0.10f else 0.13f) to Color.Black,
-            (if (isFullScreen) 0.90f else 0.87f) to Color.Black,
+            (if (isFullScreen) 0.08f else 0.12f) to Color.Black,
+            (if (isFullScreen) 0.92f else 0.88f) to Color.Black,
             1.0f to Color.Transparent,
         )
     }
@@ -1437,13 +1463,16 @@ private fun SyncedLyricsList(
         state = listState,
         modifier = (if (isFullScreen) modifier else modifier
             .fillMaxWidth()
-            .height(300.dp))
+            .height(280.dp))
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
                 drawContent()
                 drawRect(brush = fadeMask, blendMode = BlendMode.DstIn)
             },
-        contentPadding = PaddingValues(vertical = 16.dp),
+        contentPadding = PaddingValues(
+            top = if (isFullScreen) 100.dp else 16.dp,
+            bottom = if (isFullScreen) 220.dp else 16.dp,
+        ),
     ) {
         itemsIndexed(lyrics, key = { index, line -> "$index-${line.text}" }) { index, line ->
             AppleMusicLyricLineItem(
