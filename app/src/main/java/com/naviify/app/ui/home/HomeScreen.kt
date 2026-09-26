@@ -561,31 +561,9 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Picks, kept as two-column rows inside the LazyColumn with node recycling.
-            if (displayQuickPicks.isNotEmpty()) {
-                item(key = "header_quick_picks") {
-                    SectionHeader(stringResource(R.string.home_quick_picks))
-                }
-                items(
-                    items = quickPickRows,
-                    key = { row -> "qp_" + row.joinToString("_") { it.id } },
-                    contentType = { "quick_pick_row" },
-                ) { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        row.forEach { album ->
-                            AlbumCard(
-                                album = album,
-                                onClick = { onOpenAlbum(album.id) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (row.size == 1) Spacer(Modifier.weight(1f))
-                    }
-                }
-            }
+            // Quick Picks : section retiree de l'accueil (demande de Tayeb, 26/09).
+            // Le fetch reste dans HomeViewModel car `quickPicks` sert aussi a la
+            // detection du mode hors-ligne, mais plus rien n'est dessine.
         }
 
         // Error notification overlay
