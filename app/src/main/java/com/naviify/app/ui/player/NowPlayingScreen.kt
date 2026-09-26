@@ -126,6 +126,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
@@ -255,7 +256,7 @@ fun NowPlayingScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
@@ -656,25 +657,19 @@ fun NowPlayingScreen(
 @Composable
 private fun BlurredBackdrop(coverArtId: String?, modifier: Modifier = Modifier) {
     if (coverArtId.isNullOrBlank()) return
-    // Fond d'ambiance : la pochette pleine largeur, tres attenuee, sous un degrade
-    // sombre. AUCUN flou : `blur()` declenche un RenderEffect plein ecran (ouverture
-    // du lecteur lourde) et la variante "petit calque agrandi" laissait un carre
-    // visible au milieu de l'ecran. Ici c'est juste une image + un degrade : deux
-    // rectangles, rien de calculatoire.
     Box(modifier = modifier.fillMaxSize()) {
         Crossfade(
             targetState = coverArtId,
-            animationSpec = tween(400, easing = FastOutSlowInEasing),
+            animationSpec = tween(500, easing = FastOutSlowInEasing),
             label = "BackdropCrossfade",
         ) { currentCoverId ->
             CoverImage(
                 coverArtId = currentCoverId,
-                // 256 : le fond est affiche a 20% d'opacite derriere un degrade,
-                // inutile de decoder une grande image pour un lavis.
-                size = 256,
+                size = 512,
                 modifier = Modifier
                     .fillMaxSize()
-                    .alpha(0.20f),
+                    .blur(radius = 50.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .alpha(0.38f),
             )
         }
         Box(
@@ -682,9 +677,10 @@ private fun BlurredBackdrop(coverArtId: String?, modifier: Modifier = Modifier) 
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to Color(0xFF0B0B0B).copy(alpha = 0.45f),
-                        0.45f to Color(0xFF0B0B0B).copy(alpha = 0.78f),
-                        1.0f to Color(0xFF0B0B0B),
+                        0.0f to Color(0xFF0A0A0A).copy(alpha = 0.45f),
+                        0.35f to Color(0xFF0A0A0A).copy(alpha = 0.65f),
+                        0.75f to Color(0xFF0E0E0E).copy(alpha = 0.85f),
+                        1.0f to Color(0xFF0A0A0A),
                     ),
                 ),
         )
@@ -985,7 +981,7 @@ private fun LyricsCard(
         shape = RoundedCornerShape(20.dp),
         modifier = modifier.clickable { onExpand() },
     ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1022,7 +1018,7 @@ private fun LyricsCard(
                     )
                 }
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(6.dp))
             when {
                 isLoading -> {
                     Box(
@@ -1154,8 +1150,14 @@ private fun AppleMusicLyricLineItem(
     )
 
     // Taille CONSTANTE : l'accentuation passe uniquement par scale / alpha / graisse (aucun relayout).
-    val fontSize = if (isFullScreen) 28.sp else 23.sp
-    val lineHeight = if (isFullScreen) 36.sp else 30.sp
+    val fontSize = if (isFullScreen) 30.sp else 26.sp
+    val lineHeight = if (isFullScreen) 38.sp else 34.sp
+
+    val lineBlur = if (isBlurEnabled && !isActive && isSynced && distance >= 1) {
+        (distance * 1.2f).coerceAtMost(3f).dp
+    } else {
+        0.dp
+    }
 
     Box(
         modifier = Modifier
@@ -1179,9 +1181,21 @@ private fun AppleMusicLyricLineItem(
             )
             .padding(vertical = if (isFullScreen) 10.dp else 8.dp),
     ) {
-        // Plus de halo floute derriere la ligne active : c'etait le poste le plus
-        // cher (un rendu floute par ligne active, re-floute a chaque frame
-        // d'animation) et il laissait une tache grise sur fond noir.
+        // Glowing ambient halo behind active line when blur effect is enabled
+        if (isActive && isBlurEnabled) {
+            Text(
+                text = line.text,
+                fontSize = fontSize,
+                lineHeight = lineHeight,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                textAlign = TextAlign.Start,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = 0.40f }
+                    .blur(8.dp, BlurredEdgeTreatment.Unbounded),
+            )
+        }
         Text(
             text = line.text,
             fontSize = fontSize,
@@ -1189,7 +1203,9 @@ private fun AppleMusicLyricLineItem(
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
             color = Color.White.copy(alpha = animatedAlpha),
             textAlign = TextAlign.Start,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (lineBlur > 0.dp) Modifier.blur(lineBlur) else Modifier),
         )
     }
 }
@@ -1225,33 +1241,33 @@ private fun InPageSyncedLyrics(
         if (!isSynced) -1 else lyrics.indexOfLast { it.startMs != null && it.startMs <= effectivePos }
     }
 
-    // Bloc FIXE : la ligne active, la precedente (contexte) et les 3 suivantes.
-    // Aucune mesure de hauteur, aucun offset anime : le bloc entier est remplace
-    // par un fondu quand la ligne change. Rien a recaler, donc plus de ligne
-    // coupee en bas, plus d'etat casse en revenant du plein ecran.
-    val upcomingAlpha = if (isBlurEnabled) 0.50f else 0.70f
+    val upcomingAlpha = if (isBlurEnabled) 0.58f else 0.72f
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(300.dp)
+            .height(250.dp)
             .clipToBounds()
             .pointerInput(Unit) { detectTapGestures { onOpenFullScreen() } },
-        contentAlignment = Alignment.CenterStart,
+        contentAlignment = Alignment.TopStart,
     ) {
         if (!isSynced) {
-            // Paroles non synchronisees : simple extrait du debut, sans animation.
-            Column(modifier = Modifier.fillMaxWidth()) {
-                lyrics.take(7).forEachIndexed { index, line ->
+            // Paroles non synchronisees : affichage propre et lisible
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+            ) {
+                lyrics.take(6).forEachIndexed { index, line ->
                     Text(
                         text = line.text,
-                        fontSize = if (index == 0) 21.sp else 18.sp,
-                        lineHeight = if (index == 0) 28.sp else 24.sp,
-                        fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
-                        color = Color.White.copy(alpha = if (index == 0) 0.92f else 0.55f),
+                        fontSize = if (index == 0) 24.sp else 20.sp,
+                        lineHeight = if (index == 0) 32.sp else 27.sp,
+                        fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal,
+                        color = Color.White.copy(alpha = if (index == 0) 0.95f else 0.65f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(bottom = if (index == 0) 12.dp else 6.dp),
+                        modifier = Modifier.padding(bottom = if (index == 0) 10.dp else 6.dp),
                     )
                 }
             }
@@ -1260,59 +1276,91 @@ private fun InPageSyncedLyrics(
                 targetState = activeIndex,
                 transitionSpec = {
                     (
-                        fadeIn(animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)) +
+                        fadeIn(animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing)) +
                             slideInVertically(
-                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
                                 initialOffsetY = { fullHeight -> fullHeight / 6 },
                             )
                         ).togetherWith(
-                        fadeOut(animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)),
+                        fadeOut(animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)),
                     )
                 },
                 label = "in_page_lyrics_block",
             ) { index ->
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                ) {
                     lyrics.getOrNull(index - 1)?.let { previous ->
                         Text(
                             text = previous.text,
-                            fontSize = 17.sp,
-                            lineHeight = 23.sp,
-                            color = Color.White.copy(alpha = 0.38f),
+                            fontSize = 20.sp,
+                            lineHeight = 26.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White.copy(alpha = 0.45f),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(bottom = 10.dp),
+                            modifier = Modifier
+                                .padding(bottom = 10.dp)
+                                .then(if (isBlurEnabled) Modifier.blur(1.5.dp) else Modifier),
                         )
                     }
                     lyrics.getOrNull(index)?.let { current ->
-                        Text(
-                            text = current.text,
-                            fontSize = 23.sp,
-                            lineHeight = 30.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(bottom = 12.dp),
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                        ) {
+                            if (isBlurEnabled) {
+                                Text(
+                                    text = current.text,
+                                    fontSize = 26.sp,
+                                    lineHeight = 34.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .graphicsLayer { alpha = 0.45f }
+                                        .blur(8.dp, BlurredEdgeTreatment.Unbounded),
+                                )
+                            }
+                            Text(
+                                text = current.text,
+                                fontSize = 26.sp,
+                                lineHeight = 34.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
-                    // Interlude instrumental long : trois points discrets sous la ligne.
+                    // Interlude instrumental long (>= 20s) : trois points discrets
                     val currentMs = lyrics.getOrNull(index)?.startMs
                     val nextMs = lyrics.getOrNull(index + 1)?.startMs
-                    if (currentMs != null && nextMs != null && (nextMs - currentMs) >= 15000L &&
+                    if (currentMs != null && nextMs != null && (nextMs - currentMs) >= 20000L &&
                         effectivePos > currentMs + 2000L && effectivePos < nextMs
                     ) {
                         InstrumentalGapDots(isActive = true)
                     }
                     for (step in 1..3) {
                         lyrics.getOrNull(index + step)?.let { upcomingLine ->
+                            val stepBlur = if (isBlurEnabled) (step * 1.0f).coerceAtMost(2.5f).dp else 0.dp
                             Text(
                                 text = upcomingLine.text,
-                                fontSize = 18.sp,
-                                lineHeight = 24.sp,
-                                color = Color.White.copy(alpha = (upcomingAlpha - 0.08f * step).coerceAtLeast(0.22f)),
+                                fontSize = 21.sp,
+                                lineHeight = 28.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White.copy(alpha = (upcomingAlpha - 0.10f * step).coerceAtLeast(0.25f)),
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(bottom = 6.dp),
+                                modifier = Modifier
+                                    .padding(bottom = 6.dp)
+                                    .then(if (stepBlur > 0.dp) Modifier.blur(stepBlur) else Modifier),
                             )
                         }
                     }
