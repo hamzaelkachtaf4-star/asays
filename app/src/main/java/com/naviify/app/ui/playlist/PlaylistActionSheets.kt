@@ -1493,6 +1493,7 @@ private fun MixCurvePreview(
     modifier: Modifier = Modifier,
 ) {
     val outgoingColor = TextSecondary.copy(alpha = 0.70f)
+    val incomingColor = SpotifyGreen
     Surface(
         color = SurfaceCard,
         shape = RoundedCornerShape(14.dp),
@@ -1585,7 +1586,7 @@ private fun MixCurvePreview(
                 )
                 drawPath(
                     path = incoming,
-                    color = SpotifyGreen,
+                    color = incomingColor,
                     style = Stroke(width = 2.5f, cap = StrokeCap.Round),
                 )
             }
@@ -1597,7 +1598,7 @@ private fun MixCurvePreview(
                     modifier = Modifier
                         .size(width = 14.dp, height = 3.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(SpotifyGreen),
+                        .background(incomingColor),
                 )
                 Spacer(Modifier.width(6.dp))
                 Text("Incoming", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
