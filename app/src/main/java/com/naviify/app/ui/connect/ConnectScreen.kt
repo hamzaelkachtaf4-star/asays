@@ -38,10 +38,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -120,9 +119,9 @@ private fun ConnectForm(
         Image(
             painter = painterResource(R.drawable.app_logo),
             contentDescription = "ASAYS Logo",
-            modifier = Modifier
-                .size(80.dp)
-                .clip(RoundedCornerShape(20.dp)),
+            // Silhouette monochrome : la couleur vient du theme.
+            colorFilter = ColorFilter.tint(TextPrimary),
+            modifier = Modifier.size(80.dp),
         )
         Spacer(Modifier.height(12.dp))
         Text(

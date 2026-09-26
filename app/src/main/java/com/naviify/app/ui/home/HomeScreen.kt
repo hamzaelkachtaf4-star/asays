@@ -65,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -160,9 +161,10 @@ fun HomeScreen(
                             Image(
                                 painter = painterResource(R.drawable.app_logo),
                                 contentDescription = "ASAYS",
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
+                                // Silhouette monochrome : la couleur vient du theme
+                                // (blanc sur fond sombre, noir sur fond clair).
+                                colorFilter = ColorFilter.tint(TextPrimary),
+                                modifier = Modifier.size(32.dp),
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
