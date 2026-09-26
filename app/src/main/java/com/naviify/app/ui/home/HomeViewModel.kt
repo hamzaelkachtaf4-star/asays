@@ -89,6 +89,15 @@ class HomeViewModel @Inject constructor(
          * reconstruction complete de l'ecran.
          */
         private const val FRESHNESS_MS = 60_000L
+
+        /**
+         * Vrai quand [cachedHomeUiState] provient du mode hors-ligne. Le cache de
+         * fraicheur n'est alors pas exploitable pour un chargement en ligne (et
+         * inversement) : sans ce marqueur, revenir en ligne servait la liste des
+         * morceaux telecharges, et l'accueil ne se rechargeait plus jamais.
+         */
+        @Volatile
+        private var cachedHomeIsOffline: Boolean = false
     }
 
     private val _uiState = MutableStateFlow(cachedHomeUiState ?: HomeUiState())
@@ -98,6 +107,13 @@ class HomeViewModel @Inject constructor(
     val radioStations: StateFlow<List<RadioStation>> = radioRepository.stations
 
     private var loadJob: Job? = null
+
+    /**
+     * Dernier mode connu (en ligne / hors-ligne) vu par le collecteur de configuration.
+     * Permet de detecter un basculement effectue ailleurs que sur l'accueil (reglages
+     * serveur) et de recharger le contenu en consequence.
+     */
+    private var lastKnownOffline: Boolean? = null
 
     init {
         // Stations du jour : rechargees si elles manquent ou si la date a change.
@@ -111,11 +127,21 @@ class HomeViewModel @Inject constructor(
                     val home = normalizeServerUrl(config.homeServerUrl.ifBlank { com.naviify.app.core.storage.ServerConfig.DEFAULT_HOME_URL })
                     val isHome = home.isNotBlank() && effective.startsWith(home)
                     val isOffline = config.activeServerMode == ServerMode.OFFLINE
+                    val modeChanged = lastKnownOffline?.let { it != isOffline } ?: false
+                    // toggleOffline() a deja applique le nouveau mode de son cote : on ne
+                    // recharge que si le basculement vient d'ailleurs (reglages serveur),
+                    // sinon chaque bascule lançait deux chargements concurrents.
+                    val alreadyApplied = _uiState.value.isOfflineMode == isOffline
+                    lastKnownOffline = isOffline
                     _uiState.value = _uiState.value.copy(
                         serverLabel = if (isOffline || effective.isBlank()) "Offline" else if (isHome) "Home LAN" else "Tailscale",
                         serverReachable = !isOffline && effective.isNotBlank(),
                         isOfflineMode = isOffline,
                     )
+                    // Le contenu de l'autre mode ne doit jamais rester a l'ecran : un retour
+                    // en ligne sans rechargement laissait l'accueil sur les morceaux
+                    // telecharges (aucun autre appel a load() ne venait le rafraichir).
+                    if (modeChanged && !alreadyApplied) load()
                 }
         }
         viewModelScope.launch {
@@ -171,20 +197,26 @@ class HomeViewModel @Inject constructor(
     fun refresh() = loadInternal(force = true)
 
     private fun loadInternal(force: Boolean) {
-        val cached = cachedHomeUiState
-        // Sortie rapide : le contenu est deja affiche et encore frais. Sans ce garde-fou,
-        // chaque retour sur l'accueil relancait 5 requetes reseau + la reconstruction
-        // complete de l'ecran (et de toutes ses images).
-        if (!force && cached != null && System.currentTimeMillis() - cachedAtMs < FRESHNESS_MS) {
-            if (_uiState.value.isLoading) _uiState.value = _uiState.value.copy(isLoading = false)
-            return
-        }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             val config = serverConfigStore.config.first()
             val isOffline = config.activeServerMode == ServerMode.OFFLINE || serverUrlRouter.effectiveSync().isBlank()
             if (isOffline) {
                 loadOfflineState()
+                return@launch
+            }
+
+            // Sortie rapide : le contenu est deja affiche et encore frais. Sans ce garde-fou,
+            // chaque retour sur l'accueil relancait 5 requetes reseau + la reconstruction
+            // complete de l'ecran (et de toutes ses images).
+            // Le mode est resolu AVANT ce test et un cache constitue hors-ligne ne peut pas
+            // y repondre : sinon, apres un retour en ligne, l'accueil restait fige sur les
+            // morceaux telecharges (aucun autre appel a load() ne venait le rafraichir).
+            val cached = cachedHomeUiState
+            if (!force && cached != null && !cachedHomeIsOffline &&
+                System.currentTimeMillis() - cachedAtMs < FRESHNESS_MS
+            ) {
+                if (_uiState.value.isLoading) _uiState.value = _uiState.value.copy(isLoading = false)
                 return@launch
             }
 
@@ -287,6 +319,7 @@ class HomeViewModel @Inject constructor(
                         isOfflineMode = current.isOfflineMode,
                     )
                     cachedHomeUiState = finalState
+                    cachedHomeIsOffline = false
                     cachedAtMs = System.currentTimeMillis()
                     finalState
                 }
@@ -386,6 +419,7 @@ class HomeViewModel @Inject constructor(
                 serverLabel = current.serverLabel,
             )
             cachedHomeUiState = offlineState
+            cachedHomeIsOffline = true
             cachedAtMs = System.currentTimeMillis()
             offlineState
         }
