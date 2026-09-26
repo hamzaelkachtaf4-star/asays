@@ -357,6 +357,14 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - `sortTracksHarmonically(tracks, meta)` sorts on measured BPM/Camelot; unanalysed tracks stay at the end in their original order (never sorted on a hash).
 - Server pipeline behind it: `/home/tayeb/dj-analyzer` (essentia) - 1473 tracks in 27m49s, TBPM/TKEY written into 1487/1487 files, Navidrome rescanned (bpm present for 1487/1487 rows), JSON re-exported (1487 entries, 0 unmatched).
 
+### 45. Accueil allege + playlists de genre automatiques
+- Accueil : la section "Quick Picks" (12 albums sur deux colonnes) est **retiree** de `HomeScreen`. Le fetch reste dans `HomeViewModel` parce que `quickPicks` sert aussi a la detection hors-ligne, mais plus rien n'est dessine : moins de travail sur le fil d'accueil.
+- Serveur : la bibliotheque n'a **aucun tag de genre** (1487/1487 lignes vides dans `media_file`), donc `~/scripts/genre_playlists.py` classe par **artiste** (dictionnaire curate + filet "Cheb/Cheba" -> rai) et ecrit des `.m3u8` dans `/srv/media/music/Playlists`.
+- Resultat mesure : Rap Maghribi 43 titres (ElGrandeToto 20, Lbenj, Morad, Draganov, Shobee + collabs), Raï (auto) 483, Rap US 470, Rock 24, Country 12 ; 1033/1487 morceaux classes (69%).
+- Garde-fou : un `.m3u8` sans le marqueur `AUTO-GENERATED` n'est jamais ecrase (le "Raï" manuel de 746 titres est intact) ; on ecrit alors `<Nom> (auto).m3u8`.
+- Refresh : timer systemd user `genre-playlists.timer` (quotidien). Manuel : `python3 ~/scripts/genre_playlists.py`.
+- Cote app : rien a faire, Navidrome expose ces playlists comme les autres (verifie en base : les 5 presentes avec leurs comptes de titres).
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
