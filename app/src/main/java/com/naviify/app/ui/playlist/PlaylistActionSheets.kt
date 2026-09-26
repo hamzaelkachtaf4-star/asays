@@ -1133,13 +1133,7 @@ fun PlaylistMixStudioSheet(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
-                                        imageVector = when (mode) {
-                                            PlaylistMixMode.AUTO -> Icons.Rounded.AutoAwesome
-                                            PlaylistMixMode.FADE -> Icons.Rounded.GraphicEq
-                                            PlaylistMixMode.RISE -> Icons.AutoMirrored.Rounded.TrendingUp
-                                            PlaylistMixMode.MELT -> Icons.Rounded.WaterDrop
-                                            PlaylistMixMode.SLAM -> Icons.Rounded.Bolt
-                                        },
+                                        imageVector = mixModeIcon(mode),
                                         contentDescription = null,
                                         tint = if (isSelected) SpotifyGreen else TextSecondary,
                                         modifier = Modifier.size(18.dp),
@@ -1192,6 +1186,14 @@ fun PlaylistMixStudioSheet(
                         }
                     }
                 }
+
+                Spacer(Modifier.height(16.dp))
+
+                MixCurvePreview(
+                    mode = config.mode,
+                    equalPower = config.equalPowerVolume,
+                    durationSeconds = config.durationSeconds,
+                )
 
                 Spacer(Modifier.height(20.dp))
 
@@ -1624,6 +1626,8 @@ fun PlaylistTransitionBridgeSheet(
     onSelectMode: (PlaylistMixMode) -> Unit,
     onApplyToAll: (PlaylistMixMode) -> Unit,
     onResetToDefault: () -> Unit,
+    equalPowerVolume: Boolean = true,
+    durationSeconds: Float = 6f,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1882,6 +1886,15 @@ fun PlaylistTransitionBridgeSheet(
                 }
             }
 
+            Spacer(Modifier.height(16.dp))
+
+            // Courbe reellement appliquee a l'audio pour ce mode (mixGains)
+            MixCurvePreview(
+                mode = currentMode,
+                equalPower = equalPowerVolume,
+                durationSeconds = durationSeconds,
+            )
+
             Spacer(Modifier.height(20.dp))
 
             // Section: Choose Mode for this bridge
@@ -1895,106 +1908,89 @@ fun PlaylistTransitionBridgeSheet(
                 modifier = Modifier.padding(bottom = 10.dp),
             )
 
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            // Un tap pour changer de style (chips), puis le detail du style choisi
+            MixPresetChipsRow(
+                selected = currentMode,
+                onSelect = onSelectMode,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            // Detail du style selectionne : les 5 grandes cartes empilees sont
+            // remplacees par les chips ci-dessus + une seule fiche.
+            Surface(
+                color = SpotifyGreen.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.5.dp, SpotifyGreen),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                PlaylistMixMode.values().forEach { mode ->
-                    val isSelected = currentMode == mode
-                    Surface(
-                        onClick = { onSelectMode(mode) },
-                        color = if (isSelected) SpotifyGreen.copy(alpha = 0.12f) else SurfaceCard,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(
-                            width = if (isSelected) 1.5.dp else 1.dp,
-                            color = if (isSelected) SpotifyGreen else Color.White.copy(alpha = 0.06f),
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(SpotifyGreen.copy(alpha = 0.20f)),
+                        contentAlignment = Alignment.Center,
                     ) {
+                        Icon(
+                            imageVector = mixModeIcon(currentMode),
+                            contentDescription = null,
+                            tint = SpotifyGreen,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isSelected) SpotifyGreen.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.08f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = when (mode) {
-                                        PlaylistMixMode.AUTO -> Icons.Rounded.AutoAwesome
-                                        PlaylistMixMode.FADE -> Icons.Rounded.GraphicEq
-                                        PlaylistMixMode.RISE -> Icons.AutoMirrored.Rounded.TrendingUp
-                                        PlaylistMixMode.MELT -> Icons.Rounded.WaterDrop
-                                        PlaylistMixMode.SLAM -> Icons.Rounded.Bolt
-                                    },
-                                    contentDescription = null,
-                                    tint = if (isSelected) SpotifyGreen else TextSecondary,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            Text(
+                                text = currentMode.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                            )
+                            if (currentMode == defaultMode) {
+                                Surface(
+                                    color = Color.White.copy(alpha = 0.10f),
+                                    shape = RoundedCornerShape(4.dp),
                                 ) {
                                     Text(
-                                        text = mode.title,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        text = "DEFAULT",
+                                        color = TextSecondary,
+                                        fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) TextPrimary else TextSecondary,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                                     )
-                                    if (mode == defaultMode) {
-                                        Surface(
-                                            color = Color.White.copy(alpha = 0.10f),
-                                            shape = RoundedCornerShape(4.dp),
-                                        ) {
-                                            Text(
-                                                text = "DEFAULT",
-                                                color = TextSecondary,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                            )
-                                        }
-                                    }
-                                    if (isCustomOverride && isSelected) {
-                                        Surface(
-                                            color = SpotifyGreen,
-                                            shape = RoundedCornerShape(4.dp),
-                                        ) {
-                                            Text(
-                                                text = "CUSTOMIZED",
-                                                color = NaviifyBlack,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Black,
-                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                            )
-                                        }
-                                    }
                                 }
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = mode.subtitle,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                    color = TextSecondary,
-                                )
                             }
-                            if (isSelected) {
-                                Spacer(Modifier.width(8.dp))
-                                Icon(
-                                    imageVector = Icons.Rounded.Check,
-                                    contentDescription = null,
-                                    tint = SpotifyGreen,
-                                    modifier = Modifier.size(18.dp),
-                                )
+                            if (isCustomOverride) {
+                                Surface(
+                                    color = SpotifyGreen,
+                                    shape = RoundedCornerShape(4.dp),
+                                ) {
+                                    Text(
+                                        text = "CUSTOMIZED",
+                                        color = NaviifyBlack,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                    )
+                                }
                             }
                         }
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = currentMode.subtitle,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                            color = TextSecondary,
+                        )
                     }
                 }
             }
