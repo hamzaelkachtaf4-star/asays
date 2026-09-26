@@ -666,10 +666,14 @@ private fun BlurredBackdrop(coverArtId: String?, modifier: Modifier = Modifier) 
         ) { currentCoverId ->
             CoverImage(
                 coverArtId = currentCoverId,
-                size = 512,
+                // 256 px + flou 20dp (au lieu de 512/50dp) : le flou Compose est un
+                // RenderEffect plein ecran, son cout grimpe avec le rayon et la
+                // surface. 20dp suffit pour le lavis d'ambiance, et l'ouverture du
+                // lecteur (surtout depuis la recherche) arrete de saccader.
+                size = 256,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(radius = 50.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .blur(radius = 20.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                     .alpha(0.38f),
             )
         }
