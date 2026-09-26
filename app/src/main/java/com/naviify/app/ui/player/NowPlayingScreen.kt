@@ -1022,94 +1022,94 @@ private fun AppleMusicLyricLineItem(
     isSynced: Boolean,
     isBrowsing: Boolean,
     isFullScreen: Boolean,
+    isBlurEnabled: Boolean,
     offsetMs: Long,
     onSeekTo: (Long) -> Unit,
+    onExpand: () -> Unit,
 ) {
     val isActive = isSynced && index == activeIndex
     val distance = if (activeIndex >= 0) kotlin.math.abs(index - activeIndex) else 0
 
+    // Mode net (glow desactive) : contraste fort 1.0 / 0.32, aucun blur.
     val targetAlpha = when {
         !isSynced -> 0.88f
         isBrowsing -> 0.82f
+        !isBlurEnabled -> if (isActive) 1.0f else 0.32f
         isActive -> 1.0f
-        distance == 1 -> 0.72f
-        distance == 2 -> 0.48f
-        else -> 0.28f
-    }
-
-    val targetBlur = when {
-        !isSynced || isBrowsing -> 0.dp
-        isActive -> 0.dp
-        distance == 1 -> 0.8.dp
-        distance == 2 -> 1.7.dp
-        else -> 2.6.dp
+        distance == 1 -> 0.65f
+        distance == 2 -> 0.42f
+        else -> 0.26f
     }
 
     val targetScale = when {
         !isSynced -> 1.0f
-        isBrowsing -> 0.98f
-        isActive -> if (isFullScreen) 1.03f else 1.02f
+        isBrowsing -> 1.0f
+        isActive -> 1.05f
         distance == 1 -> 0.98f
-        else -> 0.96f
+        else -> 0.95f
     }
 
-    val animatedAlpha by animateFloatAsState(
-        targetValue = targetAlpha,
-        animationSpec = tween(durationMillis = 350, easing = CubicBezierEasing(0.41f, 0f, 0.12f, 0.99f)),
-        label = "lyric_alpha_$index",
-    )
     val animatedScale by animateFloatAsState(
         targetValue = targetScale,
-        animationSpec = tween(durationMillis = 350, easing = CubicBezierEasing(0.41f, 0f, 0.12f, 0.99f)),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessLow,
+        ),
         label = "lyric_scale_$index",
     )
-    val animatedBlur by animateDpAsState(
-        targetValue = targetBlur,
-        animationSpec = tween(durationMillis = 350),
-        label = "lyric_blur_$index",
+    val animatedAlpha by animateFloatAsState(
+        targetValue = targetAlpha,
+        animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+        label = "lyric_alpha_$index",
     )
 
-    val activeFontSize = if (isFullScreen) 28.sp else 23.sp
-    val activeLineHeight = if (isFullScreen) 36.sp else 30.sp
-    val inactiveFontSize = if (isFullScreen) 22.sp else 19.sp
-    val inactiveLineHeight = if (isFullScreen) 30.sp else 25.sp
+    // Taille CONSTANTE : l'accentuation passe uniquement par scale / alpha / graisse (aucun relayout).
+    val fontSize = if (isFullScreen) 28.sp else 23.sp
+    val lineHeight = if (isFullScreen) 36.sp else 30.sp
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .scale(animatedScale)
-            .clickable(enabled = line.startMs != null) {
-                line.startMs?.let { onSeekTo((it - offsetMs).coerceAtLeast(0L)) }
+            .graphicsLayer {
+                scaleX = animatedScale
+                scaleY = animatedScale
+                transformOrigin = TransformOrigin(0f, 0.5f)
+            }
+            .clickable(enabled = if (isFullScreen) line.startMs != null else true) {
+                if (isFullScreen) {
+                    // Plein ecran : tap = seek vers cette ligne
+                    line.startMs?.let { onSeekTo((it - offsetMs).coerceAtLeast(0L)) }
+                } else {
+                    // Carte repliee : tap = ouvrir le plein ecran (jamais de saut de lecture)
+                    onExpand()
+                }
             }
             .padding(vertical = if (isFullScreen) 10.dp else 8.dp),
     ) {
-        // Singing Bloom / Halo behind the active line (Apple Music & BitChord signature effect)
-        if (isActive) {
+        // Halo doux derriere la ligne active — statique (aucun blur anime -> aucun scintillement).
+        if (isActive && isBlurEnabled) {
             Text(
                 text = line.text,
-                fontSize = activeFontSize,
-                lineHeight = activeLineHeight,
+                fontSize = fontSize,
+                lineHeight = lineHeight,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
                 textAlign = TextAlign.Start,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer { alpha = 0.52f }
-                    .blur(8.dp, BlurredEdgeTreatment.Unbounded),
+                    .graphicsLayer { alpha = 0.40f }
+                    .blur(6.dp, BlurredEdgeTreatment.Unbounded),
             )
         }
 
-        // Crisp foreground text with distance-based blur & alpha
         Text(
             text = line.text,
-            fontSize = if (isActive) activeFontSize else inactiveFontSize,
-            lineHeight = if (isActive) activeLineHeight else inactiveLineHeight,
+            fontSize = fontSize,
+            lineHeight = lineHeight,
             fontWeight = if (isActive) FontWeight.Bold else FontWeight.SemiBold,
             color = Color.White.copy(alpha = animatedAlpha),
             textAlign = TextAlign.Start,
-            modifier = Modifier
-                .fillMaxWidth()
-                .blur(animatedBlur),
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -1120,7 +1120,9 @@ private fun SyncedLyricsList(
     lyrics: List<LyricsLineData>,
     offsetMs: Long = 0L,
     onSeekTo: (Long) -> Unit,
+    onExpand: () -> Unit = {},
     isFullScreen: Boolean = false,
+    isBlurEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val positionMs by positionFlow.collectAsStateWithLifecycle(initialValue = 0L)
@@ -1166,15 +1168,17 @@ private fun SyncedLyricsList(
                 isSynced = isSynced,
                 isBrowsing = listState.isScrollInProgress || userScrolledRecently,
                 isFullScreen = isFullScreen,
+                isBlurEnabled = isBlurEnabled,
                 offsetMs = offsetMs,
                 onSeekTo = onSeekTo,
+                onExpand = onExpand,
             )
 
-            // Instrumental verse break / gap indicator
+            // Instrumental verse break / gap indicator — uniquement les longues interludes (>= 15s)
             val nextLine = lyrics.getOrNull(index + 1)
             val currentMs = line.startMs
             val nextMs = nextLine?.startMs
-            if (currentMs != null && nextMs != null && (nextMs - currentMs >= 5000L)) {
+            if (currentMs != null && nextMs != null && (nextMs - currentMs >= 15000L)) {
                 val isGapActive = isSynced && effectivePos > currentMs + 2000L && effectivePos < nextMs
                 InstrumentalGapDots(isActive = isGapActive)
             }
@@ -1190,12 +1194,11 @@ private fun LyricsFullScreenView(
     track: Track?,
     lyrics: List<LyricsLineData>,
     offsetMs: Long = 0L,
+    isBlurEnabled: Boolean = true,
     onSeekTo: (Long) -> Unit,
     onTogglePlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onShare: () -> Unit,
-    onAdjustTiming: () -> Unit,
     onOpenOptions: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1253,28 +1256,12 @@ private fun LyricsFullScreenView(
                         color = TextSecondary,
                     )
                 }
-                if (lyrics.any { it.startMs != null }) {
-                    IconButton(
-                        onClick = onAdjustTiming,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Tune,
-                            contentDescription = "Adjust lyrics timing",
-                            tint = if (offsetMs != 0L) SpotifyGreen else Color.White,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = onShare,
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Share,
-                        contentDescription = "Share lyrics",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp),
+                if (lyrics.any { it.startMs != null } && offsetMs != 0L) {
+                    Text(
+                        text = if (offsetMs > 0) "+%.1fs".format(offsetMs / 1000.0) else "%.1fs".format(offsetMs / 1000.0),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SpotifyGreen,
+                        modifier = Modifier.padding(end = 4.dp),
                     )
                 }
                 IconButton(
@@ -1296,6 +1283,7 @@ private fun LyricsFullScreenView(
                 offsetMs = offsetMs,
                 onSeekTo = onSeekTo,
                 isFullScreen = true,
+                isBlurEnabled = isBlurEnabled,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
