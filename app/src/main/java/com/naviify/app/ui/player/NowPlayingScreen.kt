@@ -119,7 +119,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
@@ -127,9 +126,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -1028,15 +1030,17 @@ private fun AppleMusicLyricLineItem(
     val isActive = isSynced && index == activeIndex
     val distance = if (activeIndex >= 0) kotlin.math.abs(index - activeIndex) else 0
 
-    // Mode net (glow desactive) : contraste fort 1.0 / 0.32, aucun blur.
+    // Hierarchie douce : la ligne active reste franche, les autres ne tombent
+    // jamais dans le noir. L'ancien 0.26 pour les lignes lointaines faisait
+    // apparaitre un "degrade noir" des que la lecture sortait du mode browsing.
     val targetAlpha = when {
         !isSynced -> 0.88f
         isBrowsing -> 0.82f
-        !isBlurEnabled -> if (isActive) 1.0f else 0.32f
+        !isBlurEnabled -> if (isActive) 1.0f else 0.48f
         isActive -> 1.0f
-        distance == 1 -> 0.65f
-        distance == 2 -> 0.42f
-        else -> 0.26f
+        distance == 1 -> 0.74f
+        distance == 2 -> 0.62f
+        else -> 0.50f
     }
 
     val targetScale = when {
@@ -1084,22 +1088,9 @@ private fun AppleMusicLyricLineItem(
             }
             .padding(vertical = if (isFullScreen) 10.dp else 8.dp),
     ) {
-        // Halo doux derriere la ligne active — statique (aucun blur anime -> aucun scintillement).
-        if (isActive && isBlurEnabled) {
-            Text(
-                text = line.text,
-                fontSize = fontSize,
-                lineHeight = lineHeight,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                textAlign = TextAlign.Start,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer { alpha = 0.40f }
-                    .blur(6.dp, BlurredEdgeTreatment.Unbounded),
-            )
-        }
-
+        // Plus de halo floute derriere la ligne active : c'etait le poste le plus
+        // cher (un rendu floute par ligne active, re-floute a chaque frame
+        // d'animation) et il laissait une tache grise sur fond noir.
         Text(
             text = line.text,
             fontSize = fontSize,
@@ -1133,29 +1124,58 @@ private fun SyncedLyricsList(
     val listState = rememberLazyListState()
 
     var userScrolledRecently by remember { mutableStateOf(false) }
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (listState.isScrollInProgress) {
+    var isAutoScrolling by remember { mutableStateOf(false) }
+    val isBrowsing = listState.isScrollInProgress || userScrolledRecently
+
+    // Un defilement programme (auto-sync) ne doit JAMAIS passer pour un geste
+    // utilisateur : sinon l'auto-scroll s'auto-annulait en boucle (les paroles
+    // decrochaient du morceau et les animations s'empilaient).
+    LaunchedEffect(listState.isScrollInProgress, isAutoScrolling) {
+        if (listState.isScrollInProgress && !isAutoScrolling) {
             userScrolledRecently = true
-        } else if (userScrolledRecently) {
-            delay(1800L)
+        } else if (!listState.isScrollInProgress && userScrolledRecently) {
+            delay(2200L)
             userScrolledRecently = false
         }
     }
 
     LaunchedEffect(activeIndex, userScrolledRecently) {
         if (isSynced && !userScrolledRecently && activeIndex >= 0 && activeIndex in lyrics.indices) {
-            val target = (activeIndex - 1).coerceAtLeast(0)
+            // Deux lignes au-dessus de l'active : elle reste dans le haut du cadre,
+            // la ligne suivante reste visible (meme logique que le plein ecran).
+            val target = (activeIndex - 2).coerceAtLeast(0)
             if (listState.firstVisibleItemIndex != target) {
-                listState.animateScrollToItem(target)
+                isAutoScrolling = true
+                try {
+                    listState.animateScrollToItem(target)
+                } finally {
+                    isAutoScrolling = false
+                }
             }
         }
     }
 
+    // Masque de fondu haut/bas : une ligne a cheval sur le bord s'estompe au lieu
+    // d'etre coupee en deux (c'etait le "la premiere ligne est tranchee").
+    val fadeMask = remember(isFullScreen) {
+        Brush.verticalGradient(
+            0.0f to Color.Transparent,
+            (if (isFullScreen) 0.10f else 0.13f) to Color.Black,
+            (if (isFullScreen) 0.90f else 0.87f) to Color.Black,
+            1.0f to Color.Transparent,
+        )
+    }
+
     LazyColumn(
         state = listState,
-        modifier = if (isFullScreen) modifier else modifier
+        modifier = (if (isFullScreen) modifier else modifier
             .fillMaxWidth()
-            .height(300.dp),
+            .height(300.dp))
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(brush = fadeMask, blendMode = BlendMode.DstIn)
+            },
         contentPadding = PaddingValues(vertical = 16.dp),
     ) {
         itemsIndexed(lyrics, key = { index, line -> "$index-${line.text}" }) { index, line ->
@@ -1164,7 +1184,7 @@ private fun SyncedLyricsList(
                 index = index,
                 activeIndex = activeIndex,
                 isSynced = isSynced,
-                isBrowsing = listState.isScrollInProgress || userScrolledRecently,
+                isBrowsing = isBrowsing,
                 isFullScreen = isFullScreen,
                 isBlurEnabled = isBlurEnabled,
                 offsetMs = offsetMs,
