@@ -426,6 +426,12 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - Les coins sont arrondis dans le fond lui-meme (l'OS rogne en plus selon le lanceur).
 - Non compile sur le serveur (pas de JDK/Gradle) : verdict sur Mac avec `./gradlew assemblePerf && ./gradlew testDebugUnitTest`.
 
+### 54. Nouveau logo ASAYS (note manuscrite) + fonds de repli des widgets
+- **Logo remplace partout** : `app_logo.png` = 512 px, silhouette **blanche sur fond transparent**, extraite de la photo fournie par Tayeb avec ImageMagick (`-colorspace Gray -median 3 -negate -level 55%,72% -trim`, puis `-alpha copy -fill white -colorize 100%`). Le fond papier et les taches sont partis.
+- Icone de lancement : `ic_launcher_foreground.png` + `ic_launcher_monochrome.png` (432 px, note a ~58 % = zone sure des icones adaptatives) et les 10 bitmaps legacy `mipmap-*/ic_launcher{,_round}.png` (note blanche sur carre arrondi / cercle, fond `#000000`).
+- Le logo est une **silhouette monochrome** : sa couleur vient du theme a l'affichage (`colorFilter = ColorFilter.tint(TextPrimary)`) dans `HomeScreen` (en-tete 32 dp) et `ConnectScreen` (80 dp) - noir sur theme clair, blanc sur theme sombre. Les widgets utilisent la note blanche telle quelle (RemoteViews ne sait pas teinter une image).
+- **Piege evite** : les nouveaux layouts de widgets n'avaient aucun fond statique (le fond vient du degrade genere au runtime) -> l'apercu du selecteur de widgets serait apparu transparent avec du texte blanc. `widget_bg_bar` / `widget_bg_card` (deja presents, redevenus utiles) + nouveau `widget_bg_wide` servent de repli, et le ripple des tuiles d'acces rapide porte maintenant un creneau `#2A2A2A` arrondi.
+
 
 
 ---

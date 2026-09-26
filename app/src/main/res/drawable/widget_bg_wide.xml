@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fond statique du widget 4x2 : sert de repli dans le selecteur de widgets (et
+  pendant la premiere frame) avant que PlayerWidgetUpdater ne pose le degrade
+  genere a partir de la pochette.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#F0181818" />
+    <corners android:radius="24dp" />
+    <stroke android:width="1dp" android:color="#333333" />
+</shape>
