@@ -1,7 +1,49 @@
 package com.naviify.app.core.network.dto
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+
+/**
+ * Handles Subsonic / Navidrome `starred` fields which can be either a boolean
+ * (`true`/`false`) or an ISO-8601 timestamp string (`"2026-09-25T12:43:26.100467464Z"`).
+ */
+object StarredSerializer : KSerializer<Boolean> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("StarredSerializer", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): Boolean {
+        val jsonDecoder = decoder as? JsonDecoder
+        if (jsonDecoder != null) {
+            val element = jsonDecoder.decodeJsonElement()
+            return when {
+                element is JsonNull -> false
+                element is JsonPrimitive -> {
+                    element.booleanOrNull ?: (element.content.isNotBlank() && !element.content.equals("false", ignoreCase = true))
+                }
+                else -> false
+            }
+        }
+        return runCatching { decoder.decodeBoolean() }
+            .getOrElse {
+                val str = runCatching { decoder.decodeString() }.getOrNull()
+                str?.isNotBlank() == true && !str.equals("false", ignoreCase = true)
+            }
+    }
+
+    override fun serialize(encoder: Encoder, value: Boolean) {
+        encoder.encodeBoolean(value)
+    }
+}
 
 @Serializable
 data class Indexes(
@@ -24,7 +66,7 @@ data class ArtistID3(
     @SerialName("coverArt") val coverArt: String? = null,
     @SerialName("albumCount") val albumCount: Int = 0,
     @SerialName("artistImageUrl") val artistImageUrl: String? = null,
-    val starred: Boolean? = null,
+    @Serializable(with = StarredSerializer::class) val starred: Boolean? = null,
     @SerialName("userRating") val userRating: Int? = null,
     @SerialName("averageRating") val averageRating: Double? = null,
     @SerialName("playCount") val playCount: Long? = null,
@@ -37,7 +79,7 @@ data class ArtistWithAlbumsID3(
     @SerialName("coverArt") val coverArt: String? = null,
     @SerialName("albumCount") val albumCount: Int = 0,
     @SerialName("artistImageUrl") val artistImageUrl: String? = null,
-    val starred: Boolean? = null,
+    @Serializable(with = StarredSerializer::class) val starred: Boolean? = null,
     @SerialName("userRating") val userRating: Int? = null,
     @SerialName("averageRating") val averageRating: Double? = null,
     @SerialName("playCount") val playCount: Long? = null,
@@ -57,7 +99,7 @@ data class AlbumID3(
     val created: String? = null,
     val year: Int? = null,
     val genre: String? = null,
-    val starred: Boolean? = null,
+    @Serializable(with = StarredSerializer::class) val starred: Boolean? = null,
     @SerialName("userRating") val userRating: Int? = null,
     @SerialName("averageRating") val averageRating: Double? = null,
 )
@@ -75,7 +117,7 @@ data class AlbumWithSongsID3(
     val created: String? = null,
     val year: Int? = null,
     val genre: String? = null,
-    val starred: Boolean? = null,
+    @Serializable(with = StarredSerializer::class) val starred: Boolean? = null,
     @SerialName("userRating") val userRating: Int? = null,
     @SerialName("averageRating") val averageRating: Double? = null,
     val song: List<Child> = emptyList(),
@@ -107,7 +149,7 @@ data class Child(
     val path: String? = null,
     @SerialName("playCount") val playCount: Long? = null,
     val created: String? = null,
-    val starred: Boolean? = null,
+    @Serializable(with = StarredSerializer::class) val starred: Boolean? = null,
     @SerialName("userRating") val userRating: Int? = null,
     @SerialName("averageRating") val averageRating: Double? = null,
     @SerialName("bookmarkPosition") val bookmarkPosition: Long? = null,

@@ -128,6 +128,31 @@ class SubsonicDtoParsingTest {
         assertTrue(lyric!!.contains("[00:12.00]In the next world war"))
     }
 
+    @Test
+    fun `parses starred field as ISO timestamp string, boolean, or null`() {
+        // ISO-8601 timestamp string from Navidrome
+        val jsonTimestamp = """
+            {"id":"art-1","name":"Test Artist","starred":"2026-09-25T12:43:26.100467464Z"}
+        """.trimIndent()
+        val artistTimestamp = json.decodeFromString<com.naviify.app.core.network.dto.ArtistID3>(jsonTimestamp)
+        assertEquals(true, artistTimestamp.starred)
+
+        // Boolean true
+        val jsonTrue = """{"id":"art-2","name":"Test Artist","starred":true}"""
+        val artistTrue = json.decodeFromString<com.naviify.app.core.network.dto.ArtistID3>(jsonTrue)
+        assertEquals(true, artistTrue.starred)
+
+        // Boolean false
+        val jsonFalse = """{"id":"art-3","name":"Test Artist","starred":false}"""
+        val artistFalse = json.decodeFromString<com.naviify.app.core.network.dto.ArtistID3>(jsonFalse)
+        assertEquals(false, artistFalse.starred)
+
+        // Missing / null
+        val jsonNull = """{"id":"art-4","name":"Test Artist"}"""
+        val artistNull = json.decodeFromString<com.naviify.app.core.network.dto.ArtistID3>(jsonNull)
+        assertEquals(null, artistNull.starred)
+    }
+
     private fun parse(fileName: String): SubsonicEnvelope {
         val content = requireNotNull(javaClass.classLoader!!.getResource(fileName)) {
             "Missing test resource $fileName"
