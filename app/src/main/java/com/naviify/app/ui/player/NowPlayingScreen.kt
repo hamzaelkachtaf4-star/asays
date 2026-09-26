@@ -656,35 +656,36 @@ fun NowPlayingScreen(
 @Composable
 private fun BlurredBackdrop(coverArtId: String?, modifier: Modifier = Modifier) {
     if (coverArtId.isNullOrBlank()) return
-    // Cout GPU : le flou est calcule sur un PETIT calque (128dp) qui est ensuite
-    // agrandi 6x. Le rendu final est un lavis flou equivalent a un flou plein
-    // ecran, mais le RenderEffect ne traite que ~128x128 px au lieu de toute la
-    // surface. C'est l'ancien `blur(60.dp)` plein ecran qui rendait l'ouverture
-    // du lecteur lourde (surtout en arrivant depuis la recherche).
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .clipToBounds(),
-        contentAlignment = Alignment.Center,
-    ) {
+    // Fond d'ambiance : la pochette pleine largeur, tres attenuee, sous un degrade
+    // sombre. AUCUN flou : `blur()` declenche un RenderEffect plein ecran (ouverture
+    // du lecteur lourde) et la variante "petit calque agrandi" laissait un carre
+    // visible au milieu de l'ecran. Ici c'est juste une image + un degrade : deux
+    // rectangles, rien de calculatoire.
+    Box(modifier = modifier.fillMaxSize()) {
         Crossfade(
             targetState = coverArtId,
-            animationSpec = tween(700, easing = FastOutSlowInEasing),
+            animationSpec = tween(400, easing = FastOutSlowInEasing),
             label = "BackdropCrossfade",
         ) { currentCoverId ->
             CoverImage(
                 coverArtId = currentCoverId,
-                size = 256,
+                size = 512,
                 modifier = Modifier
-                    .size(128.dp)
-                    .blur(14.dp)
-                    .graphicsLayer {
-                        scaleX = 6f
-                        scaleY = 6f
-                    }
-                    .alpha(0.30f),
+                    .fillMaxSize()
+                    .alpha(0.20f),
             )
         }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to Color(0xFF0B0B0B).copy(alpha = 0.45f),
+                        0.45f to Color(0xFF0B0B0B).copy(alpha = 0.78f),
+                        1.0f to Color(0xFF0B0B0B),
+                    ),
+                ),
+        )
     }
 }
 
@@ -1220,91 +1221,97 @@ private fun InPageSyncedLyrics(
         if (!isSynced) -1 else lyrics.indexOfLast { it.startMs != null && it.startMs <= effectivePos }
     }
 
-    // Positions mesurees (px, relatives a la colonne) : remplies au premier layout
-    // et seulement si la geometrie change reellement (la translation GPU ne
-    // declenche aucun relayout, donc aucune boucle de mesure).
-    val lineTops = remember(lyrics) { mutableStateMapOf<Int, Float>() }
-    val lineHeights = remember(lyrics) { mutableStateMapOf<Int, Float>() }
-    var viewportPx by remember { mutableFloatStateOf(0f) }
-
-    val targetY = remember(activeIndex, lineTops.toMap(), lineHeights.toMap(), viewportPx) {
-        if (activeIndex < 0 || viewportPx <= 0f) {
-            0f
-        } else {
-            val top = lineTops[activeIndex] ?: 0f
-            val height = lineHeights[activeIndex] ?: 0f
-            (top + height / 2f - viewportPx * 0.42f).coerceAtLeast(0f)
-        }
-    }
-    val animatedY by animateFloatAsState(
-        targetValue = targetY,
-        animationSpec = tween(durationMillis = 620, easing = FastOutSlowInEasing),
-        label = "in_page_lyrics_offset",
-    )
-
-    // Masque haut/bas : une ligne a cheval sur le bord s'estompe au lieu d'etre
-    // coupee net.
-    // Fenetre de lignes : on ne compose QUE les lignes autour de la ligne active.
-    // Composer les 100+ lignes d'un morceau d'un coup creait 2 animations par
-    // ligne (~200 Animatable) a l'ouverture du lecteur : c'etait lourd.
-    val windowSize = 14
-    val windowStart = (activeIndex - 5).coerceAtLeast(0)
-    val windowEnd = (windowStart + windowSize).coerceAtMost(lyrics.size)
-    val firstVisible = (windowEnd - windowSize).coerceAtLeast(0)
-    val visibleLines = remember(lyrics, firstVisible, windowEnd) { lyrics.subList(firstVisible, windowEnd) }
-
-    val fadeMask = remember {
-        Brush.verticalGradient(
-            0.0f to Color.Transparent,
-            0.12f to Color.Black,
-            0.88f to Color.Black,
-            1.0f to Color.Transparent,
-        )
-    }
+    // Bloc FIXE : la ligne active, la precedente (contexte) et les 3 suivantes.
+    // Aucune mesure de hauteur, aucun offset anime : le bloc entier est remplace
+    // par un fondu quand la ligne change. Rien a recaler, donc plus de ligne
+    // coupee en bas, plus d'etat casse en revenant du plein ecran.
+    val upcomingAlpha = if (isBlurEnabled) 0.50f else 0.70f
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(300.dp)
             .clipToBounds()
-            .onSizeChanged { viewportPx = it.height.toFloat() }
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                drawRect(brush = fadeMask, blendMode = BlendMode.DstIn)
-            }
             .pointerInput(Unit) { detectTapGestures { onOpenFullScreen() } },
+        contentAlignment = Alignment.CenterStart,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer { translationY = -animatedY },
-        ) {
-            visibleLines.forEachIndexed { localIndex, line ->
-                val index = firstVisible + localIndex
-                AppleMusicLyricLineItem(
-                    line = line,
-                    index = index,
-                    activeIndex = activeIndex,
-                    isSynced = isSynced,
-                    isBrowsing = false,
-                    isFullScreen = false,
-                    isBlurEnabled = isBlurEnabled,
-                    offsetMs = offsetMs,
-                    onSeekTo = {},
-                    onExpand = onOpenFullScreen,
-                    onPositioned = { measuredIndex, top, height ->
-                        lineTops[measuredIndex] = top
-                        lineHeights[measuredIndex] = height
-                    },
-                )
-
-                val nextLine = lyrics.getOrNull(index + 1)
-                val currentMs = line.startMs
-                val nextMs = nextLine?.startMs
-                if (currentMs != null && nextMs != null && (nextMs - currentMs >= 15000L)) {
-                    val isGapActive = isSynced && effectivePos > currentMs + 2000L && effectivePos < nextMs
-                    InstrumentalGapDots(isActive = isGapActive)
+        if (!isSynced) {
+            // Paroles non synchronisees : simple extrait du debut, sans animation.
+            Column(modifier = Modifier.fillMaxWidth()) {
+                lyrics.take(7).forEachIndexed { index, line ->
+                    Text(
+                        text = line.text,
+                        fontSize = if (index == 0) 21.sp else 18.sp,
+                        lineHeight = if (index == 0) 28.sp else 24.sp,
+                        fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal,
+                        color = Color.White.copy(alpha = if (index == 0) 0.92f else 0.55f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(bottom = if (index == 0) 12.dp else 6.dp),
+                    )
+                }
+            }
+        } else {
+            AnimatedContent(
+                targetState = activeIndex,
+                transitionSpec = {
+                    (
+                        fadeIn(animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)) +
+                            slideInVertically(
+                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                initialOffsetY = { fullHeight -> fullHeight / 6 },
+                            )
+                        ).togetherWith(
+                        fadeOut(animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)),
+                    )
+                },
+                label = "in_page_lyrics_block",
+            ) { index ->
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    lyrics.getOrNull(index - 1)?.let { previous ->
+                        Text(
+                            text = previous.text,
+                            fontSize = 17.sp,
+                            lineHeight = 23.sp,
+                            color = Color.White.copy(alpha = 0.38f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                    }
+                    lyrics.getOrNull(index)?.let { current ->
+                        Text(
+                            text = current.text,
+                            fontSize = 23.sp,
+                            lineHeight = 30.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        )
+                    }
+                    // Interlude instrumental long : trois points discrets sous la ligne.
+                    val currentMs = lyrics.getOrNull(index)?.startMs
+                    val nextMs = lyrics.getOrNull(index + 1)?.startMs
+                    if (currentMs != null && nextMs != null && (nextMs - currentMs) >= 15000L &&
+                        effectivePos > currentMs + 2000L && effectivePos < nextMs
+                    ) {
+                        InstrumentalGapDots(isActive = true)
+                    }
+                    for (step in 1..3) {
+                        lyrics.getOrNull(index + step)?.let { upcomingLine ->
+                            Text(
+                                text = upcomingLine.text,
+                                fontSize = 18.sp,
+                                lineHeight = 24.sp,
+                                color = Color.White.copy(alpha = (upcomingAlpha - 0.08f * step).coerceAtLeast(0.22f)),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
