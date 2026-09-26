@@ -321,6 +321,19 @@ Below is the chronological log of all 27 major milestones implemented, tested, a
 - **WARNING — the "DJ metadata" in these sheets is fabricated**: `getDjBpm()` returns `84 + (hash % 45)` and `getCamelotKey()` derives the key from a hash of id/artist, so every displayed BPM, Camelot key, "−21 bpm" delta and the "Harmonic Warmth (−1)" banner are invented, not measured. Real values need either BPM/key tags in the files (Navidrome can expose them) or an offline analysis pass. Never build beatmatching/tempo sync on top of these numbers.
 - **Not compiled on the server** — run `./gradlew assemblePerf` on the Mac.
 
+### 41. Real DJ metadata (BPM + key) — server pipeline replaces the hashed values
+- `getDjBpm()` / `getCamelotKey()` in `domain/model/PlaylistMix.kt` fabricate their values from a hash. Real values now come from an offline analysis pipeline on the home server: `/home/tayeb/dj-analyzer/` (essentia `RhythmExtractor2013(multifeature)` + `KeyExtractor(edma)`, ffmpeg decode of a 45 s segment at 25 % of the file), ~1.2 s/track, 1487 tracks ≈ 30 min, resumable cache `results.jsonl`.
+- Validation: `make_tests.py` builds synthetic tracks with a known answer (120/95/128 bpm clicks, C/A/F triads) — the analyser reproduces 120.0 / 128.2 / 95.0 bpm and 8B / 8A / 7B.
+- Published to the app as JSON keyed by **Navidrome pid**: `GET http://<serveur>:8788/djmeta.json` (user unit `djmeta-http.service`, file `djmeta_navidrome.json`, fields `bpm`, `key`, `camelot`, `bpmConfidence`, `keyConfidence`).
+- Also written into the files as ID3 `TBPM`/`TKEY`, so after a Navidrome rescan the Subsonic API returns a real `bpm` (`Child.BPM json:"bpm"`). Navidrome has **no key column**, so the Camelot can only come from the JSON endpoint.
+- App side still to do: map `Track.bpm` / `Track.camelot` from the API/JSON and remove the hash helpers. Until that lands, the mix sheets keep showing invented numbers.
+
+## Compose "blind coding" rules (this server has no Android SDK)
+The Mac agent compiles what is written here; a mistake costs a full build round-trip. Non-negotiable:
+- Theme colours are **dynamic composable getters**: `val SpotifyGreen: Color @Composable get() = LocalNaviifyPalette.current.accent` (same for `TextPrimary`, `TextSecondary`, `SurfaceCard`, `SurfaceCardHigh`, `ThemeOutline`, `NaviifyBlack`). They may only be read from a composable scope.
+- Never read them inside `Canvas { }`, `Modifier.drawBehind { }`, `graphicsLayer { }`, `remember { }`, `LaunchedEffect` or any other non-composable lambda. Capture the colour into a local `val` first (`val incomingColor = SpotifyGreen`) and use that inside the lambda. Reading `LocalNaviifyPalette.current` itself is allowed (not annotated), but calling the annotated getters is not.
+- Check `ui/theme/Color.kt` and `Type.kt` before assuming a colour or style is a static object.
+
 ---
 
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
