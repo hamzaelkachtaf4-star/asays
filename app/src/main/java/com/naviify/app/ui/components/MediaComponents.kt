@@ -796,7 +796,10 @@ fun PlaylistCard(
     modifier: Modifier = Modifier,
 ) {
     val isVirtualLibrary = playlist.id == "virtual-library"
-    val coverUrl = remember(playlist.id, playlist.coverArtId) {
+    // La version entre dans les cles : poser ou retirer une pochette
+    // personnelle force une recomposition et une nouvelle cle Coil.
+    val coverVersion = CoverUrls.coverVersion
+    val coverUrl = remember(playlist.id, playlist.coverArtId, coverVersion) {
         if (isVirtualLibrary) null else CoverUrls.playlistUrl(playlist.id, playlist.coverArtId, 256)
     }
 
@@ -1033,7 +1036,10 @@ fun PlaylistRow(
     modifier: Modifier = Modifier,
 ) {
     val isVirtualLibrary = playlist.id == "virtual-library"
-    val coverUrl = remember(playlist.id, playlist.coverArtId) {
+    // La version entre dans les cles : poser ou retirer une pochette
+    // personnelle force une recomposition et une nouvelle cle Coil.
+    val coverVersion = CoverUrls.coverVersion
+    val coverUrl = remember(playlist.id, playlist.coverArtId, coverVersion) {
         if (isVirtualLibrary) null else CoverUrls.playlistUrl(playlist.id, playlist.coverArtId, 256)
     }
     Row(
