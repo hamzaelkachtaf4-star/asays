@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Barre compacte 4x1, facon Spotify : fond degrade (couleur de la pochette,
-  genere par PlayerWidgetUpdater), pochette ronde a gauche, titre/artiste, et
-  3 controles seulement (precedent / lecture / suivant).
+  genere par PlayerWidgetUpdater), pochette a gauche, titre/artiste, et 3
+  controles (precedent / lecture / suivant).
+
+  Systeme commun aux trois tailles de widget : padding 12dp sur les cotes,
+  pochette 46dp, titre 14sp gras, artiste 12sp (80% blanc), bouton lecture
+  cercle blanc 40dp (glyphe 18dp), precedent/suivant 32dp (glyphe 18dp).
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -23,8 +27,8 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:baselineAligned="false"
-        android:paddingStart="10dp"
-        android:paddingEnd="8dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
         android:paddingTop="6dp"
         android:paddingBottom="6dp">
 
@@ -32,7 +36,7 @@
             android:id="@+id/widget_album_art"
             android:layout_width="46dp"
             android:layout_height="46dp"
-            android:scaleType="fitXY"
+            android:scaleType="centerInside"
             android:src="@drawable/app_logo"
             android:contentDescription="@string/widget_artwork" />
 
@@ -42,7 +46,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="10dp"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="8dp"
             android:orientation="vertical">
 
             <TextView
@@ -61,9 +65,9 @@
                 android:id="@+id/widget_artist"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
+                android:layout_marginTop="2dp"
                 android:text="@string/widget_ready_to_play"
-                android:textColor="#D9FFFFFF"
+                android:textColor="#CCFFFFFF"
                 android:textSize="12sp"
                 android:maxLines="1"
                 android:singleLine="true"
@@ -77,15 +81,15 @@
             android:background="@drawable/widget_btn_ripple"
             android:src="@drawable/ic_widget_skip_previous"
             android:scaleType="centerInside"
-            android:padding="6dp"
+            android:padding="7dp"
             android:contentDescription="@string/widget_action_previous" />
 
         <ImageButton
             android:id="@+id/widget_btn_play_pause"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
             android:background="@drawable/widget_play_btn_white"
             android:src="@drawable/ic_widget_play"
             android:scaleType="centerInside"
@@ -99,7 +103,7 @@
             android:background="@drawable/widget_btn_ripple"
             android:src="@drawable/ic_widget_skip_next"
             android:scaleType="centerInside"
-            android:padding="6dp"
+            android:padding="7dp"
             android:contentDescription="@string/widget_action_next" />
     </LinearLayout>
 </FrameLayout>

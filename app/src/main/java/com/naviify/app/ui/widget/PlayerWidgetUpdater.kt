@@ -53,16 +53,18 @@ object PlayerWidgetUpdater {
     private const val CARD_ART_PX = 288
     private const val CARD_ART_RADIUS_PX = 34f
     private const val WIDE_ART_PX = 176
-    private const val WIDE_ART_RADIUS_PX = 14f
+    private const val WIDE_ART_RADIUS_PX = 17f
     private const val WIDE_BG_WIDTH_PX = 420
     private const val WIDE_BG_HEIGHT_PX = 210
     private const val TILE_PX = 96
-    private const val TILE_RADIUS_PX = 12f
+    private const val TILE_RADIUS_PX = 15f
     private const val TILE_COUNT = 5
 
-    /** Rayon des coins des fonds de widget, en px de la taille de reference. */
-    private const val BAR_CORNER_PX = 36f
-    private const val WIDE_CORNER_PX = 36f
+    /** Rayon des coins des fonds de widget, en px de la taille de reference.
+     *  Reference : ~800px de large sur son telephone -> 26px ~ 20dp, soit le
+     *  meme rayon que le liseré des drawables de repli. */
+    private const val BAR_CORNER_PX = 26f
+    private const val WIDE_CORNER_PX = 26f
 
     private const val REQUEST_BAR_OPEN = 10
     private const val REQUEST_BAR_PLAY_PAUSE = 11

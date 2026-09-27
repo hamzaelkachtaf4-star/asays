@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Tuile 2x2 facon Spotify : pochette plein cadre (coins arrondis inclus dans le
-  bitmap genere), bandeau bas degrade avec titre/artiste et le bouton lecture.
-  Toute la surface ouvre l'app ; seul le bouton lecture declenche la lecture.
+  Tuile 2x2 facon Spotify : pochette plein cadre, bandeau bas degrade avec
+  titre/artiste et bouton lecture. Toute la surface ouvre l'app ; seul le bouton
+  lecture declenche la lecture.
+
+  Le placeholder (logo centre) est dessine SOUS la pochette : des qu'une pochette
+  est posee par PlayerWidgetUpdater elle le recouvre, sinon c'est le logo qui
+  reste visible (apercu propre dans le selecteur de widgets).
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_card_root"
@@ -11,12 +15,31 @@
     android:background="@drawable/widget_bg_card">
 
     <ImageView
+        android:id="@+id/widget_card_placeholder"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerInside"
+        android:padding="34dp"
+        android:src="@drawable/app_logo"
+        android:contentDescription="@null" />
+
+    <ImageView
         android:id="@+id/widget_card_art"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="fitXY"
-        android:src="@drawable/app_logo"
         android:contentDescription="@string/widget_artwork" />
+
+    <ImageView
+        android:id="@+id/widget_card_logo"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="12dp"
+        android:alpha="0.45"
+        android:src="@drawable/ic_launcher_monochrome"
+        android:contentDescription="@null" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -25,8 +48,9 @@
         android:background="@drawable/widget_scrim_strip"
         android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:baselineAligned="false"
         android:paddingStart="12dp"
-        android:paddingEnd="10dp">
+        android:paddingEnd="12dp">
 
         <LinearLayout
             android:id="@+id/widget_card_open_app_area"
@@ -41,7 +65,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/widget_default_title"
                 android:textColor="#FFFFFF"
-                android:textSize="13sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:singleLine="true"
@@ -51,9 +75,10 @@
                 android:id="@+id/widget_card_artist"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:text="@string/widget_ready_to_play"
-                android:textColor="#D9FFFFFF"
-                android:textSize="11sp"
+                android:textColor="#CCFFFFFF"
+                android:textSize="12sp"
                 android:maxLines="1"
                 android:singleLine="true"
                 android:ellipsize="end" />
@@ -63,11 +88,11 @@
             android:id="@+id/widget_card_btn_play_pause"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="8dp"
             android:background="@drawable/widget_play_btn_white"
             android:src="@drawable/ic_widget_play"
             android:scaleType="centerInside"
-            android:padding="10dp"
+            android:padding="11dp"
             android:contentDescription="@string/widget_action_play" />
     </LinearLayout>
 </FrameLayout>

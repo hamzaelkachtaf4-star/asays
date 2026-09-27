@@ -436,6 +436,12 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 
 ---
 
+### 55. Widgets : un seul systeme de design pour les trois tailles
+- **Grille commune** : padding lateral 12 dp, pochette 46 dp (4x1) / 58 dp (4x2), titre **14 sp gras**, artiste **12 sp `#CCFFFFFF`**, bouton lecture = **cercle blanc 40 dp** (glyphe 18 dp), precedent/suivant = **32 dp** (glyphe 18 dp). Avant l'harmonisation : titres 14/13/15 sp, artistes 12/11/12 sp et controles 42/40/30 dp selon la taille.
+- **Coins** : rayon 20 dp partout. Les fonds generes avaient 36 px de rayon sur une reference de 420 px, soit ~28 dp une fois etires a la taille reelle du widget, contre 20-24 dp pour les drawables de repli -> `BAR_CORNER_PX`/`WIDE_CORNER_PX` passes a **26 px** (reference ~800 px sur son telephone) et les trois drawables alignes a 20 dp. Liseré passe de `#333333` a `#22FFFFFF` (se voit aussi sur un degrade colore).
+- **Rayons des pochettes** exprimes dans la meme unite visuelle : bar 14/112 px, wide 17/176 px, tuiles 15/96 px (~5,5 dp) au lieu de trois proportions differentes.
+- **Placeholder** : le logo ASAYS est centre (`scaleType="centerInside"`) dans la pochette tant qu'aucun morceau n'a joue, au lieu d'etre etire en plein cadre ; sur la tuile 2x2 la pochette reste plein cadre et un `widget_card_placeholder` dessine **sous** elle porte le logo (il disparait tout seul des qu'une pochette est posee). Petite marque ASAYS (`ic_launcher_monochrome`, 14 dp, alpha 0,45) en haut a droite de la tuile 2x2.
+
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
 
 1. **Static Salt for Coil Caching**:

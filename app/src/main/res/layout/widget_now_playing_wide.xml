@@ -4,6 +4,10 @@
   titre/artiste + 3 controles sur la premiere ligne, puis une ligne de 5 tuiles
   (file d'attente en cours) qui ouvrent l'app d'un seul tap.
   Les pochettes des tuiles sont posees par PlayerWidgetUpdater.
+
+  Meme systeme que le 4x1 : titre 14sp gras, artiste 12sp (80% blanc), pochette
+  (logo centre tant qu'aucune pochette n'est posee), bouton lecture cercle blanc
+  40dp, precedent/suivant 32dp.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_wide_root"
@@ -38,7 +42,7 @@
                 android:id="@+id/widget_wide_art"
                 android:layout_width="58dp"
                 android:layout_height="58dp"
-                android:scaleType="fitXY"
+                android:scaleType="centerInside"
                 android:src="@drawable/app_logo"
                 android:contentDescription="@string/widget_artwork" />
 
@@ -48,7 +52,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="10dp"
-                android:layout_marginEnd="4dp"
+                android:layout_marginEnd="8dp"
                 android:orientation="vertical">
 
                 <TextView
@@ -57,7 +61,7 @@
                     android:layout_height="wrap_content"
                     android:text="@string/widget_default_title"
                     android:textColor="#FFFFFF"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
                     android:maxLines="1"
                     android:singleLine="true"
@@ -67,9 +71,9 @@
                     android:id="@+id/widget_wide_artist"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
+                    android:layout_marginTop="2dp"
                     android:text="@string/widget_ready_to_play"
-                    android:textColor="#D9FFFFFF"
+                    android:textColor="#CCFFFFFF"
                     android:textSize="12sp"
                     android:maxLines="1"
                     android:singleLine="true"
@@ -78,34 +82,34 @@
 
             <ImageButton
                 android:id="@+id/widget_wide_btn_prev"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:background="@drawable/widget_btn_ripple"
                 android:src="@drawable/ic_widget_skip_previous"
                 android:scaleType="centerInside"
-                android:padding="6dp"
+                android:padding="7dp"
                 android:contentDescription="@string/widget_action_previous" />
 
             <ImageButton
                 android:id="@+id/widget_wide_btn_play_pause"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="2dp"
-                android:layout_marginEnd="2dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
                 android:background="@drawable/widget_play_btn_white"
                 android:src="@drawable/ic_widget_play"
                 android:scaleType="centerInside"
-                android:padding="10dp"
+                android:padding="11dp"
                 android:contentDescription="@string/widget_action_play" />
 
             <ImageButton
                 android:id="@+id/widget_wide_btn_next"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:background="@drawable/widget_btn_ripple"
                 android:src="@drawable/ic_widget_skip_next"
                 android:scaleType="centerInside"
-                android:padding="6dp"
+                android:padding="7dp"
                 android:contentDescription="@string/widget_action_next" />
         </LinearLayout>
 
