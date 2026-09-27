@@ -58,6 +58,7 @@ import androidx.compose.material.icons.rounded.WaterDrop
 import com.naviify.app.ui.theme.NaviifyBlack
 import com.naviify.app.domain.model.PlaylistMixConfig
 import com.naviify.app.domain.model.PlaylistMixMode
+import com.naviify.app.domain.model.MixPresets
 import com.naviify.app.domain.model.CamelotKey
 import com.naviify.app.domain.model.HarmonicRelationship
 import com.naviify.app.domain.model.analyzeHarmonicRelationship
@@ -2210,10 +2211,10 @@ fun PlaylistTransitionBridgeSheet(
                 modifier = Modifier.padding(bottom = 10.dp),
             )
 
-            // Un tap pour changer de style (chips), puis le detail du style choisi
-            MixPresetChipsRow(
-                selected = currentMode,
-                onSelect = onSelectMode,
+            // Le menu Mix : les cinq familles de presets, en pages balayables.
+            MixPresetPager(
+                selectedPresetId = MixPresets.closest(currentMode)?.id,
+                onPresetSelected = { preset -> onSelectMode(preset.mode) },
             )
 
             Spacer(Modifier.height(12.dp))

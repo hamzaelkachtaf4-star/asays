@@ -199,6 +199,16 @@ object MixPresets {
 
     fun byId(id: String?): MixPreset? = all.firstOrNull { it.id == id }
 
+    /**
+     * Preset le plus proche d'un mode de lecture. Sert a mettre en evidence la ligne
+     * active quand seule la famille importe (une transition choisie morceau par
+     * morceau ne connait que son mode). Les presets qui ne s'entendent qu'en apercu
+     * sont ignores : on ne coche pas une case dont le reglage n'est pas applique.
+     */
+    fun closest(mode: PlaylistMixMode): MixPreset? = all.firstOrNull {
+        it.mode == mode && !it.needsRender
+    }
+
     /** Preset dont le reglage correspond exactement a la configuration courante. */
     fun matching(
         mode: PlaylistMixMode,
