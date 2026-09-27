@@ -25,6 +25,17 @@ data class ConnectDevice(
     val isActive: Boolean = false,
 )
 
+/** Un morceau de la file partagee (assez pour reprendre la lecture ailleurs). */
+@Serializable
+data class ConnectQueueItem(
+    val id: String,
+    val title: String = "",
+    val artist: String = "",
+    val album: String = "",
+    val coverArt: String? = null,
+    val duration: Int = 0,
+)
+
 @Serializable
 data class ConnectPlayerState(
     val trackId: String? = null,
@@ -36,8 +47,8 @@ data class ConnectPlayerState(
     val positionMs: Long = 0L,
     val playing: Boolean = false,
     val volume: Double = 1.0,
-    /** Identifiants Subsonic des morceaux de la file, dans l'ordre. */
-    val queue: List<String> = emptyList(),
+    /** La file, en clair : chaque appareil peut la reprendre sans requete. */
+    val queue: List<ConnectQueueItem> = emptyList(),
     val queueIndex: Int = 0,
     val deviceId: String? = null,
     val deviceName: String? = null,

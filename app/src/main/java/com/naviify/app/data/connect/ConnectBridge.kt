@@ -49,7 +49,16 @@ class ConnectBridge @Inject constructor(
             positionMs = state.positionMs,
             playing = state.isPlaying,
             volume = 1.0,
-            queue = state.queue.map { it.id },
+            queue = state.queue.map {
+                ConnectQueueItem(
+                    id = it.id,
+                    title = it.title ?: "",
+                    artist = it.artist ?: "",
+                    album = it.album ?: "",
+                    coverArt = it.coverArtId,
+                    duration = it.duration,
+                )
+            },
             queueIndex = state.currentIndex,
             deviceId = repository.deviceId,
             deviceName = repository.deviceName,
