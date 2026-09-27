@@ -340,6 +340,7 @@ fun HomeScreen(
                                 item.coverArtId,
                                 item.playlistId,
                                 item.isPlaylist,
+                                com.naviify.app.core.image.CoverUrls.coverVersion,
                             ) {
                                 if (item.isPlaylist && item.playlistId != null) {
                                     com.naviify.app.core.image.CoverUrls.playlistUrl(
@@ -381,7 +382,13 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         items(state.quickGridItems, key = { "qa_list_" + it.id }) { item ->
-                            val tileCover = remember(item.id, item.coverArtId, item.playlistId, item.isPlaylist) {
+                            val tileCover = remember(
+                                item.id,
+                                item.coverArtId,
+                                item.playlistId,
+                                item.isPlaylist,
+                                com.naviify.app.core.image.CoverUrls.coverVersion,
+                            ) {
                                 if (item.isPlaylist && item.playlistId != null) {
                                     com.naviify.app.core.image.CoverUrls.playlistUrl(item.playlistId, item.coverArtId, 256)
                                 } else {
