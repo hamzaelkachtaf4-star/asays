@@ -127,7 +127,10 @@ class OfflinePlaylistStore @Inject constructor(
         persistToDisk()
     }
 
-    fun getDownloadedPlaylists(downloadedTrackIds: Set<String>): List<Playlist> {
+    fun getDownloadedPlaylists(
+        downloadedTrackIds: Set<String>,
+        coverByTrackId: Map<String, String> = emptyMap(),
+    ): List<Playlist> {
         return inMemoryCache.values.mapNotNull { stored ->
             val matchingCount = stored.tracks.count { downloadedTrackIds.contains(it.id) }
             if (matchingCount > 0) {
@@ -136,7 +139,11 @@ class OfflinePlaylistStore @Inject constructor(
                     name = sanitizePlaylistName(stored.name),
                     comment = stored.comment,
                     owner = stored.owner,
-                    coverArtId = stored.coverArtId,
+                    // Hors-ligne, la pochette de la playlist n'est pas forcement dans le
+                    // resume : on retombe sur la pochette du premier morceau telecharge
+                    // (sinon l'accueil hors-ligne n'affichait qu'un aplat de couleur).
+                    coverArtId = stored.coverArtId
+                        ?: stored.tracks.firstNotNullOfOrNull { coverByTrackId[it.id] },
                     songCount = matchingCount,
                 )
             } else null

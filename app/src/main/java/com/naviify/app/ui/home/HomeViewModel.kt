@@ -138,6 +138,13 @@ class HomeViewModel @Inject constructor(
                         serverReachable = !isOffline && effective.isNotBlank(),
                         isOfflineMode = isOffline,
                     )
+                    // La configuration du serveur arrive souvent APRES l'init du
+                    // ViewModel : le premier chargement de la radio echouait alors sur
+                    // "aucun serveur configure", et rien ne revenait dessus (la section
+                    // "Radio du jour" n'apparaissait plus jamais). ensureLoaded est
+                    // idempotent : il ressort tout de suite si les stations du jour
+                    // sont deja en memoire.
+                    radioRepository.ensureLoaded(viewModelScope)
                     // Le contenu de l'autre mode ne doit jamais rester a l'ecran : un retour
                     // en ligne sans rechargement laissait l'accueil sur les morceaux
                     // telecharges (aucun autre appel a load() ne venait le rafraichir).
@@ -205,6 +212,11 @@ class HomeViewModel @Inject constructor(
                 loadOfflineState()
                 return@launch
             }
+
+            // Les stations du jour suivent le meme cycle que l'accueil : un retour en
+            // ligne ou un refresh manuel les retente aussi (ensureLoaded ressort
+            // immediatement si elles sont deja chargees pour la journee).
+            radioRepository.ensureLoaded(viewModelScope)
 
             // Sortie rapide : le contenu est deja affiche et encore frais. Sans ce garde-fou,
             // chaque retour sur l'accueil relancait 5 requetes reseau + la reconstruction

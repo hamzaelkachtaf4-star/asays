@@ -442,6 +442,12 @@ The Mac agent compiles what is written here; a mistake costs a full build round-
 - **Rayons des pochettes** exprimes dans la meme unite visuelle : bar 14/112 px, wide 17/176 px, tuiles 15/96 px (~5,5 dp) au lieu de trois proportions differentes.
 - **Placeholder** : le logo ASAYS est centre (`scaleType="centerInside"`) dans la pochette tant qu'aucun morceau n'a joue, au lieu d'etre etire en plein cadre ; sur la tuile 2x2 la pochette reste plein cadre et un `widget_card_placeholder` dessine **sous** elle porte le logo (il disparait tout seul des qu'une pochette est posee). Petite marque ASAYS (`ic_launcher_monochrome`, 14 dp, alpha 0,45) en haut a droite de la tuile 2x2.
 
+### 56. Accueil : la radio du jour revient, plus de doublons hors-ligne, pochettes hors-ligne
+- **Radio du jour invisible** : `RadioRepository.ensureLoaded()` n'etait appele qu'une fois, dans `init` du `HomeViewModel`, alors que la configuration serveur (`ServerConfigStore`) arrive **apres** : `endpointUrl()` renvoyait null, `lastError = "aucun serveur configure"`, zero station, et aucun appel ne revenait dessus - la section disparaissait pour toute la session. `ensureLoaded` est maintenant rappele quand la configuration/URL effective change et a chaque `load()` en ligne (il ressort immediatement si les stations du jour sont deja en memoire).
+- **Playlists en double hors-ligne** : quand une playlist est recreee cote serveur, l'app garde l'ancien resume (ancien id) ET le nouveau ; le filtre hors-ligne ne dedupliquait que par **id**, donc "Fuck off" et "1" apparaissaient deux fois. Deduplication par **nom** (`MediaRepository.getPlaylists`, on garde l'entree au plus grand nombre de morceaux telecharges).
+- **Pochettes hors-ligne** : `OfflinePlaylistStore.getDownloadedPlaylists()` retombe sur la pochette du premier morceau telecharge quand le resume n'en a pas (avant : aplat de couleur sur l'accueil hors-ligne).
+- Rappel de diagnostic : `curl -m5 http://127.0.0.1:8788/radio.json` (attendu HTTP 200, ~38 Ko, 6 stations) + `systemctl --user status djmeta-http` - le serveur n'etait pas en cause.
+
 ## 4. Subsonic & Navidrome Specifics / Critical Gotchas
 
 1. **Static Salt for Coil Caching**:

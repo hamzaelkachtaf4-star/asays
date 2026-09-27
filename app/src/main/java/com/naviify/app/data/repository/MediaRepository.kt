@@ -341,12 +341,24 @@ class MediaRepository @Inject constructor(
             return listOf(libraryPlaylist) + serverPlaylists
         } else {
             // Offline fallback: only playlists that have downloaded tracks
-            val offlinePlaylists = offlinePlaylistStore?.getDownloadedPlaylists(downloadedTrackIds).orEmpty()
-            val hasOfflineMyOwn = offlinePlaylists.any {
+            val coverByTrackId = downloadedTracks
+                .mapNotNull { entity -> entity.coverArtId?.takeIf { it.isNotBlank() }?.let { entity.trackId to it } }
+                .toMap()
+            val offlinePlaylists = offlinePlaylistStore
+                ?.getDownloadedPlaylists(downloadedTrackIds, coverByTrackId)
+                .orEmpty()
+            // Un meme nom peut exister sous deux identifiants : quand une playlist est
+            // recreee cote serveur, l'app garde l'ancien resume ET le nouveau, et
+            // l'accueil hors-ligne affichait deux fois la meme playlist ("Fuck off",
+            // "1"). On ne garde que celui qui a le plus de morceaux telecharges.
+            val uniqueOffline = offlinePlaylists
+                .groupBy { it.name.trim().lowercase(java.util.Locale.ROOT) }
+                .map { (_, same) -> same.maxByOrNull { it.songCount } ?: same.first() }
+            val hasOfflineMyOwn = uniqueOffline.any {
                 it.name.trim().equals(VIRTUAL_LIBRARY_NAME, ignoreCase = true)
             }
             if (hasOfflineMyOwn) {
-                return offlinePlaylists.distinctBy { it.id }
+                return uniqueOffline
             }
             val libraryPlaylist = Playlist(
                 id = VIRTUAL_LIBRARY_PLAYLIST_ID,
@@ -355,7 +367,7 @@ class MediaRepository @Inject constructor(
                 owner = "Device",
                 songCount = downloadedTracks.size,
             )
-            return (listOf(libraryPlaylist) + offlinePlaylists).distinctBy { it.id }
+            return (listOf(libraryPlaylist) + uniqueOffline).distinctBy { it.id }
         }
     }
 
