@@ -56,6 +56,19 @@ class ConnectBridge @Inject constructor(
                 }
             }
         }
+        // L'utilisateur lance la musique ICI : ce telephone prend la main, et
+        // l'autre appareil s'arrete. C'est ce qui manquait : sans ca le site
+        // continuait de jouer et les deux appareils chantaient ensemble.
+        scope.launch {
+            runCatching {
+                var wasPlaying = false
+                controller.state.collect { state ->
+                    val playing = state.isPlaying
+                    if (playing && !wasPlaying && !repository.isActive) repository.activateSelf()
+                    wasPlaying = playing
+                }
+            }
+        }
     }
 
     /** Ce que le hub (et donc le site) voit de ce telephone. */

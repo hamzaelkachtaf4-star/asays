@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -39,7 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.naviify.app.data.connect.ConnectDevice
-import com.naviify.app.ui.theme.SpotifyGreen
+import com.naviify.app.ui.theme.ConnectGreen
 import com.naviify.app.ui.theme.SurfaceCardHigh
 import com.naviify.app.ui.theme.TextPrimary
 import com.naviify.app.ui.theme.TextSecondary
@@ -51,6 +52,9 @@ import com.naviify.app.ui.theme.TextSecondary
  * sur lui a distance.
  */
 @OptIn(ExperimentalMaterial3Api::class)
+/** Le vert de Spotify, en dur : le theme de l'appli peut etre rouge. */
+private val ConnectGreen = Color(0xFF1ED760)
+
 @Composable
 fun ConnectDevicesSheet(
     viewModel: ConnectDevicesViewModel,
@@ -90,7 +94,7 @@ fun ConnectDevicesSheet(
                     Icon(
                         imageVector = if (active.kind == "web") Icons.Rounded.Computer else Icons.Rounded.Smartphone,
                         contentDescription = null,
-                        tint = SpotifyGreen,
+                        tint = ConnectGreen,
                         modifier = Modifier.size(26.dp),
                     )
                     Spacer(Modifier.width(12.dp))
@@ -98,7 +102,7 @@ fun ConnectDevicesSheet(
                         Text(
                             text = if (selfActive) "Cet appareil" else active.name,
                             style = MaterialTheme.typography.titleMedium,
-                            color = SpotifyGreen,
+                            color = ConnectGreen,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -120,7 +124,7 @@ fun ConnectDevicesSheet(
                     Icon(
                         imageVector = Icons.Rounded.Check,
                         contentDescription = "Appareil actif",
-                        tint = SpotifyGreen,
+                        tint = ConnectGreen,
                         modifier = Modifier.size(20.dp),
                     )
                 }
@@ -180,7 +184,7 @@ fun ConnectDevicesSheet(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(999.dp))
                         .clickable { viewModel.activateSelf() },
-                    color = SpotifyGreen,
+                    color = ConnectGreen,
                     shape = RoundedCornerShape(999.dp),
                 ) {
                     Column(
@@ -226,7 +230,7 @@ private fun DeviceRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isActive) SpotifyGreen else TextSecondary,
+                tint = if (isActive) ConnectGreen else TextSecondary,
                 modifier = Modifier.size(24.dp),
             )
             Spacer(Modifier.width(14.dp))
@@ -234,7 +238,7 @@ private fun DeviceRow(
                 Text(
                     text = device.name.ifBlank { "Appareil" },
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (isActive) SpotifyGreen else TextPrimary,
+                    color = if (isActive) ConnectGreen else TextPrimary,
                     fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -251,7 +255,7 @@ private fun DeviceRow(
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = "Appareil actif",
-                    tint = SpotifyGreen,
+                    tint = ConnectGreen,
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -288,7 +292,7 @@ private fun RemoteTransport(
                 .clip(CircleShape)
                 .clickable { onCommand(if (playing) "pause" else "play") },
             shape = CircleShape,
-            color = SpotifyGreen,
+            color = ConnectGreen,
         ) {
             Icon(
                 imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
