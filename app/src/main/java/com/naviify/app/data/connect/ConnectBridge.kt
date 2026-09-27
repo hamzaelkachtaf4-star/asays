@@ -2,6 +2,10 @@ package com.naviify.app.data.connect
 
 import com.naviify.app.core.playback.PlaybackController
 import com.naviify.app.domain.model.Track
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,6 +30,8 @@ class ConnectBridge @Inject constructor(
 
     private var started = false
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     fun start() {
         if (started) return
         started = true
@@ -34,6 +40,22 @@ class ConnectBridge @Inject constructor(
             onCommand = ::apply,
             onTransfer = ::adopt,
         )
+        // Un autre appareil prend la lecture (le Mac, par exemple) : ce telephone
+        // devient une telecommande, donc il coupe son propre son. Sans ca les deux
+        // appareils jouent en meme temps : c'est le "manque de synchronisation".
+        scope.launch {
+            runCatching {
+                var mine = true
+                repository.cluster.collect { cluster ->
+                    val activeId = cluster?.activeId
+                    val isMine = activeId == null || activeId == repository.deviceId
+                    if (!isMine && mine && controller.state.value.isPlaying) {
+                        controller.pausePlayback()
+                    }
+                    mine = isMine
+                }
+            }
+        }
     }
 
     /** Ce que le hub (et donc le site) voit de ce telephone. */

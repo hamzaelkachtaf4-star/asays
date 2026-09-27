@@ -76,21 +76,61 @@ fun ConnectDevicesSheet(
                 .padding(start = 20.dp, end = 20.dp, bottom = 18.dp),
         ) {
             Text(
-                text = "Ecouter sur",
-                style = MaterialTheme.typography.titleLarge,
+                text = "Connect",
+                style = MaterialTheme.typography.headlineSmall,
                 color = TextPrimary,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.size(4.dp))
-            Text(
-                text = when {
-                    active == null -> "Aucun appareil connecte pour l'instant."
-                    selfActive -> "Cet appareil joue."
-                    else -> "Lecture sur ${active.name}"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-            )
+            Spacer(Modifier.size(14.dp))
+
+            // L'appareil qui joue, en grand et en vert, avec ce qu'il diffuse :
+            // c'est la disposition de la feuille Connect de Spotify.
+            if (active != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (active.kind == "web") Icons.Rounded.Computer else Icons.Rounded.Smartphone,
+                        contentDescription = null,
+                        tint = SpotifyGreen,
+                        modifier = Modifier.size(26.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (selfActive) "Cet appareil" else active.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = SpotifyGreen,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        val playingLine = listOfNotNull(
+                            cluster?.player?.title,
+                            cluster?.player?.artist,
+                        ).filter { it.isNotBlank() }.joinToString(" — ")
+                        if (playingLine.isNotBlank()) {
+                            Text(
+                                text = playingLine,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = "Appareil actif",
+                        tint = SpotifyGreen,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            } else {
+                Text(
+                    text = "Aucun appareil connecte pour l'instant.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary,
+                )
+            }
             Spacer(Modifier.size(16.dp))
 
             // Les commandes a distance n'ont de sens que si un autre appareil joue.
@@ -128,6 +168,34 @@ fun ConnectDevicesSheet(
                         },
                     )
                     Spacer(Modifier.size(8.dp))
+                }
+            }
+
+            // Le geste principal, comme le gros bouton du bas chez Spotify :
+            // reprendre la lecture sur ce telephone.
+            if (!selfActive && active != null) {
+                Spacer(Modifier.size(18.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(999.dp))
+                        .clickable { viewModel.activateSelf() },
+                    color = SpotifyGreen,
+                    shape = RoundedCornerShape(999.dp),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = "Lire sur ce telephone",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = SurfaceCardHigh,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
         }
