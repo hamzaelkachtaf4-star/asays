@@ -391,6 +391,43 @@ fun NowPlayingScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 6.dp),
                     )
+
+                    // Comme sur Spotify : la ligne verte de l'appareil qui joue,
+                    // tout en bas de la fiche. Un appui ouvre la feuille Connect.
+                    val connectVm: ConnectDevicesViewModel = hiltViewModel()
+                    val connectCluster by connectVm.cluster.collectAsStateWithLifecycle()
+                    val remoteDevice = connectCluster?.devices
+                        ?.firstOrNull { it.isActive && it.id != connectVm.selfId }
+                    if (remoteDevice != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
+                                .clickable { showDevices = true },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = if (remoteDevice.kind == "web") {
+                                    Icons.Rounded.Computer
+                                } else {
+                                    Icons.Rounded.Smartphone
+                                },
+                                contentDescription = null,
+                                tint = SpotifyGreen,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "Lecture sur ${remoteDevice.name}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SpotifyGreen,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+
                     Spacer(Modifier.height(32.dp))
                 }
             }
