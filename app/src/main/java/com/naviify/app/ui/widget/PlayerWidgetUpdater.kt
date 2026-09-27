@@ -426,7 +426,7 @@ object PlayerWidgetUpdater {
 
     private fun tileBitmap(coverArtId: String): Bitmap? = artworkBitmap(coverArtId, TILE_PX, TILE_RADIUS_PX)
 
-    private fun loadTile(context: Context, coverArtId: String): Bitmap? =
+    private suspend fun loadTile(context: Context, coverArtId: String): Bitmap? =
         tileBitmap(coverArtId) ?: loadArtwork(context, coverArtId, TILE_PX, TILE_RADIUS_PX)
 
     /**
@@ -445,7 +445,7 @@ object PlayerWidgetUpdater {
     }
 
     /** Charge + arrondit une pochette (mise en cache), null si indisponible. */
-    private fun loadArtwork(context: Context, coverArtId: String, sizePx: Int, radiusPx: Float): Bitmap? {
+    private suspend fun loadArtwork(context: Context, coverArtId: String, sizePx: Int, radiusPx: Float): Bitmap? {
         artworkBitmap(coverArtId, sizePx, radiusPx)?.let { return it }
 
         val url = CoverUrls.url(coverArtId, 512) ?: return null
