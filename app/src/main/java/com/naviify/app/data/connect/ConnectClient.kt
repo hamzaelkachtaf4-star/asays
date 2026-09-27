@@ -84,11 +84,6 @@ class ConnectClient @Inject constructor(private val json: Json) {
         http.newCall(request).execute().use { it.isSuccessful }
     }.getOrDefault(false)
 
-    /** Encode n'importe lequel de nos messages en JSON. */
-    inline fun <reified T> encode(value: T): String = json.encodeToString(value)
-    // (retire : l'encodage se fait avec des serializers explicites, plus surs a
-    // relire et sans dependre d'une extension importee par effet de bord)
-
     private fun parse(name: String, data: String): ConnectEvent? = runCatching {
         when (name) {
             "cluster" -> ConnectEvent.Cluster(json.decodeFromString(ConnectCluster.serializer(), data))

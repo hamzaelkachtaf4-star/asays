@@ -8,6 +8,7 @@ import com.naviify.app.core.network.SessionStateHolder
 import com.naviify.app.core.network.SubsonicUrlProvider
 import com.naviify.app.core.storage.ServerConfigStore
 import com.naviify.app.core.image.CoverUrls
+import com.naviify.app.data.connect.ConnectBridge
 import com.naviify.app.data.download.DownloadRepository
 import com.naviify.app.data.repository.FavoritesRepository
 import com.naviify.app.domain.playback.PlayerQueueStore
@@ -33,6 +34,7 @@ class NaviifyApplication : Application(), coil.ImageLoaderFactory {
     @Inject lateinit var downloadRepository: DownloadRepository
     @Inject lateinit var playerQueueStore: PlayerQueueStore
     @Inject lateinit var favoritesRepository: FavoritesRepository
+    @Inject lateinit var connectBridge: ConnectBridge
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -43,6 +45,9 @@ class NaviifyApplication : Application(), coil.ImageLoaderFactory {
         Coil.setImageLoader(imageLoader)
         CoverUrls.provider = urlProvider
         CoverUrls.downloadRepository = downloadRepository
+        // Relie l'application au hub "Ecouter sur" : annonce du telephone, envoi
+        // de ce qui joue, et reception des ordres du site web.
+        connectBridge.start()
         appScope.launch {
             // Warm the in-memory session before the first network request so
             // interceptors never need to touch disk.
