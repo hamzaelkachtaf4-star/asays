@@ -44,8 +44,6 @@ import com.naviify.app.domain.model.MixPreset
 import com.naviify.app.domain.model.MixPresets
 import com.naviify.app.domain.model.MixWaveform
 import com.naviify.app.ui.theme.MixColors
-import com.naviify.app.ui.theme.SurfaceCard
-import com.naviify.app.ui.theme.SurfaceCardHigh
 import com.naviify.app.ui.theme.TextPrimary
 import com.naviify.app.ui.theme.TextSecondary
 
