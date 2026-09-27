@@ -75,9 +75,6 @@ fun MixPresetPickerSheet(
     onCustomize: (MixCategory) -> Unit = {},
     onDone: () -> Unit = {},
 ) {
-    val categories = remember { MixCategory.values().toList() }
-    val pagerState = rememberPagerState(pageCount = { categories.size })
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MixColors.panel,
@@ -118,29 +115,12 @@ fun MixPresetPickerSheet(
             )
 
             // ------------------------------------------------- cinq pages de presets
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxWidth(),
-                pageSpacing = 12.dp,
-            ) { page ->
-                val category = categories[page]
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    MixCategoryHeader(
-                        category = category,
-                        onCustomize = { onCustomize(category) },
-                    )
-                    MixPresets.byCategory(category).forEach { preset ->
-                        MixPresetRow(
-                            preset = preset,
-                            isSelected = preset.id == selectedPresetId,
-                            onClick = { onPresetSelected(preset) },
-                        )
-                    }
-                }
-            }
+            MixPresetPager(
+                selectedPresetId = selectedPresetId,
+                onPresetSelected = onPresetSelected,
+                onCustomize = onCustomize,
+            )
 
-            Spacer(Modifier.height(12.dp))
-            MixPagerDots(count = categories.size, active = pagerState.currentPage)
             Spacer(Modifier.height(18.dp))
 
             // ------------------------------------------------------------ termine
@@ -317,6 +297,47 @@ private fun MixWaveformCanvas(
             topLeft = Offset(half - gap * 4, 0f),
             size = androidx.compose.ui.geometry.Size(gap * 8, size.height),
         )
+    }
+}
+
+/**
+ * Les cinq familles de presets en pages balayables, avec les points sous les pages.
+ * Reutilisable partout ou l'on choisit un preset : la feuille complete comme la
+ * feuille d'une transition entre deux morceaux.
+ */
+@Composable
+fun MixPresetPager(
+    selectedPresetId: String?,
+    onPresetSelected: (MixPreset) -> Unit,
+    onCustomize: (MixCategory) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    val categories = remember { MixCategory.values().toList() }
+    val pagerState = rememberPagerState(pageCount = { categories.size })
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+            pageSpacing = 12.dp,
+        ) { page ->
+            val category = categories[page]
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                MixCategoryHeader(
+                    category = category,
+                    onCustomize = { onCustomize(category) },
+                )
+                MixPresets.byCategory(category).forEach { preset ->
+                    MixPresetRow(
+                        preset = preset,
+                        isSelected = preset.id == selectedPresetId,
+                        onClick = { onPresetSelected(preset) },
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        MixPagerDots(count = categories.size, active = pagerState.currentPage)
     }
 }
 
