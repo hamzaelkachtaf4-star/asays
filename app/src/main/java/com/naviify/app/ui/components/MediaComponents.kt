@@ -815,8 +815,8 @@ fun PlaylistCard(
             coverUrl = coverUrl,
             // Include the playlist id: the URL is signed per request, so a
             // URL-only key would collide across playlists and serve the wrong art.
-            memoryCacheKey = "playlist-cover-${playlist.id}",
-            diskCacheKey = "playlist-cover-${playlist.id}",
+            memoryCacheKey = "playlist-cover-${playlist.id}-$coverVersion",
+            diskCacheKey = "playlist-cover-${playlist.id}-$coverVersion",
             iconSize = 44.dp,
             showLetter = true,
             modifier = Modifier
@@ -1054,8 +1054,8 @@ fun PlaylistRow(
             playlistId = playlist.id,
             playlistName = playlist.name,
             coverUrl = coverUrl,
-            memoryCacheKey = "playlist-cover-${playlist.id}",
-            diskCacheKey = "playlist-cover-${playlist.id}",
+            memoryCacheKey = "playlist-cover-${playlist.id}-$coverVersion",
+            diskCacheKey = "playlist-cover-${playlist.id}-$coverVersion",
             iconSize = 26.dp,
             showLetter = true,
             modifier = Modifier

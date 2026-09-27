@@ -458,6 +458,10 @@ class PlaylistDetailViewModel @Inject constructor(
                 }.getOrNull() ?: false
             }
             if (ok) {
+                // Vide le LRU d'URL et incremente la version : sans ca, les
+                // listes (Bibliotheque, onglet Playlists, feuilles d'actions)
+                // gardaient l'ancienne pochette en cache.
+                com.naviify.app.core.image.CoverUrls.invalidateCoverCaches()
                 _uiState.value = _uiState.value.copy(
                     hasCustomCover = true,
                     coverUpdateTrigger = System.currentTimeMillis(),
@@ -469,6 +473,7 @@ class PlaylistDetailViewModel @Inject constructor(
     fun resetToServerCover() {
         viewModelScope.launch {
             mediaRepository.resetPlaylistCover(playlistId)
+            com.naviify.app.core.image.CoverUrls.invalidateCoverCaches()
             _uiState.value = _uiState.value.copy(
                 hasCustomCover = false,
                 coverUpdateTrigger = System.currentTimeMillis(),
