@@ -75,8 +75,11 @@ class ConnectRepository @Inject constructor(
     ) {
         if (started) return
         started = true
-        scope.launch { eventLoop(onCommand, onTransfer) }
-        scope.launch { heartbeatLoop(stateProvider) }
+        // runCatching : une exception dans une coroutine non rattrapee tuerait
+        // l'application entiere (le SupervisorJob protege les voisines, pas la
+        // thread). Le hub est un confort, jamais une raison de planter.
+        scope.launch { runCatching { eventLoop(onCommand, onTransfer) } }
+        scope.launch { runCatching { heartbeatLoop(stateProvider) } }
     }
 
     /** Publie l'etat du lecteur (morceau, position, file d'attente). */

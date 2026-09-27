@@ -46,8 +46,9 @@ class NaviifyApplication : Application(), coil.ImageLoaderFactory {
         CoverUrls.provider = urlProvider
         CoverUrls.downloadRepository = downloadRepository
         // Relie l'application au hub "Ecouter sur" : annonce du telephone, envoi
-        // de ce qui joue, et reception des ordres du site web.
-        connectBridge.start()
+        // de ce qui joue, et reception des ordres du site web. Enveloppe dans un
+        // runCatching : une panne du hub ne doit JAMAIS faire mourir l'application.
+        runCatching { connectBridge.start() }
         appScope.launch {
             // Warm the in-memory session before the first network request so
             // interceptors never need to touch disk.
