@@ -1,6 +1,7 @@
 package com.naviify.app.data.connect
 
 import com.naviify.app.core.playback.PlaybackController
+import com.naviify.app.domain.model.Track
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -83,13 +84,30 @@ class ConnectBridge @Inject constructor(
     }
 
     /**
-     * La lecture nous est confiee depuis un autre appareil.
+     * La lecture nous est confiee depuis un autre appareil : on reprend la meme
+     * file, au meme morceau et a la meme seconde.
      *
-     * On ne relance pas encore le morceau : reprendre une file demande de
-     * resoudre ses identifiants Subsonic en [com.naviify.app.domain.model.Track].
-     * Le hub a deja mis en pause l'appareil precedent, donc rien ne joue deux fois.
+     * La file partagee ne transporte que des identifiants Subsonic et de quoi
+     * afficher la pochette, donc on reconstruit des morceaux jouables a partir de
+     * ces champs : la lecture reprend sans aucune requete au serveur.
      */
     private fun adopt(player: ConnectPlayerState) {
-        if (player.queue.isEmpty()) return
+        val items = player.queue
+        if (items.isEmpty()) return
+        val queue = items.map { it.toTrack() }
+        val index = player.queueIndex.coerceIn(0, queue.lastIndex)
+        controller.play(queue, startIndex = index)
+        if (player.positionMs > 0) controller.seekTo(player.positionMs)
+        // Un transfert demande pendant une pause doit nous laisser en pause.
+        if (!player.playing) controller.pausePlayback()
     }
+
+    private fun ConnectQueueItem.toTrack(): Track = Track(
+        id = id,
+        title = title.ifBlank { "Sans titre" },
+        artist = artist.ifBlank { null },
+        album = album.ifBlank { null },
+        coverArtId = coverArt,
+        duration = duration,
+    )
 }

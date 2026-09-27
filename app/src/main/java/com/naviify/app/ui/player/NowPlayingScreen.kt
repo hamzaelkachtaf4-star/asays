@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -160,6 +161,8 @@ import com.naviify.app.ui.components.MarqueeText
 import com.naviify.app.ui.components.EmptyState
 import com.naviify.app.ui.components.ErrorBanner
 import com.naviify.app.ui.components.formatDuration
+import com.naviify.app.ui.connect.ConnectDevicesSheet
+import com.naviify.app.ui.connect.ConnectDevicesViewModel
 import com.naviify.app.ui.download.DownloadViewModel
 import com.naviify.app.ui.download.TrackDownloadState
 import com.naviify.app.ui.playlist.PlaylistsViewModel
@@ -236,6 +239,7 @@ fun NowPlayingScreen(
     val scope = rememberCoroutineScope()
 
     var showQueue by rememberSaveable { mutableStateOf(false) }
+    var showDevices by rememberSaveable { mutableStateOf(false) }
     var showOptions by rememberSaveable { mutableStateOf(false) }
     var showAddToPlaylist by rememberSaveable { mutableStateOf(false) }
     var showSleepPicker by rememberSaveable { mutableStateOf(false) }
@@ -288,6 +292,13 @@ fun NowPlayingScreen(
                             tint = TextPrimary,
                         )
                     }
+                }
+                IconButton(onClick = { showDevices = true }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Cast,
+                        contentDescription = "Ecouter sur un autre appareil",
+                        tint = TextPrimary,
+                    )
                 }
                 IconButton(onClick = { showQueue = true }) {
                     Icon(
@@ -425,6 +436,12 @@ fun NowPlayingScreen(
             onToggleShuffle = { viewModel.setShuffle(!isShuffleEnabled) },
             onReshuffle = viewModel::reshuffleQueue,
             onClear = viewModel::clear,
+        )
+    }
+    if (showDevices) {
+        ConnectDevicesSheet(
+            viewModel = hiltViewModel(),
+            onDismiss = { showDevices = false },
         )
     }
     if (showOptions && track != null) {
