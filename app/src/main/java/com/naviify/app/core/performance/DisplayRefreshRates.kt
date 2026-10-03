@@ -9,7 +9,7 @@ private const val MAX_REASONABLE_REFRESH_RATE = 240
 
 /**
  * Refresh rates the current display can actually select, normalized for UI labels.
- * Extracted and optimized from BitChord performance architecture.
+ * Dynamically probes supported display refresh rates.
  */
 fun Display?.supportedPerformanceRefreshRates(): List<Int> {
     val fallback = this?.refreshRate?.roundToInt()?.coerceAtLeast(MIN_PERFORMANCE_REFRESH_RATE) ?: 60

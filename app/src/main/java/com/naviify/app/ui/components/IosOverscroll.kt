@@ -37,7 +37,7 @@ private const val fastBounceStiffness = 130f
 
 /**
  * Converts raw pull distance to UIKit's self-limiting rubber-band curve.
- * Extracted and optimized from BitChord's iOS interaction physics.
+ * Optimized iOS-style rubber-band interaction physics.
  */
 private fun rubberBand(rawDistance: Float, containerPx: Float): Float {
     val dimension = containerPx.takeIf { it > 0f } ?: fallbackContainerPx

@@ -674,7 +674,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             }
         }
 
-        // 7. Fluidity & Motion (BitChord High-Refresh & Elastic Overscroll)
+        // 7. Fluidity & Motion (High-Refresh & Elastic Overscroll)
         item {
             val currentDisplay = LocalView.current.display
             val supportedRates = remember(currentDisplay) {
@@ -794,7 +794,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         )
                         Text(
                             text = if (state.iosOverscrollEnabled) {
-                                "UIKit rubber-band elasticity with critically damped physics (BitChord engine)."
+                                "UIKit rubber-band elasticity with critically damped physics."
                             } else {
                                 "Standard Android stretch effect."
                             },
@@ -815,7 +815,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             }
         }
 
-        // 8. Security, Privacy & Keystore (BitChord Architecture)
+        // 8. Security, Privacy & Keystore Architecture
         item {
             SettingsGroupCard(
                 title = "Security & Privacy",

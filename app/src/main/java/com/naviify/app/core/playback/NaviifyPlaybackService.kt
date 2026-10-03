@@ -40,6 +40,21 @@ class NaviifyPlaybackService : MediaLibraryService() {
     private lateinit var player: ExoPlayer
     private lateinit var libraryCallback: NaviifyLibraryCallback
 
+    /**
+     * Keeps the custom layout and home-screen widgets in sync with the player.
+     * Held as a field so it can be detached before [player] is released.
+     */
+    private val playerListener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            if (::libraryCallback.isInitialized) libraryCallback.updateCustomLayout()
+            com.naviify.app.ui.widget.PlayerWidgetUpdater.updateAllWidgets(this@NaviifyPlaybackService)
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            com.naviify.app.ui.widget.PlayerWidgetUpdater.updateAllWidgets(this@NaviifyPlaybackService)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         player = ExoPlayer.Builder(this)
@@ -79,16 +94,7 @@ class NaviifyPlaybackService : MediaLibraryService() {
 
         libraryCallback.attachSession(mediaLibrarySession)
 
-        player.addListener(object : Player.Listener {
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                libraryCallback.updateCustomLayout()
-                com.naviify.app.ui.widget.PlayerWidgetUpdater.updateAllWidgets(this@NaviifyPlaybackService)
-            }
-
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                com.naviify.app.ui.widget.PlayerWidgetUpdater.updateAllWidgets(this@NaviifyPlaybackService)
-            }
-        })
+        player.addListener(playerListener)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession =
@@ -108,6 +114,9 @@ class NaviifyPlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        // Detach first: release() can still dispatch final events, and the
+        // listener would otherwise touch a released callback / dead service.
+        if (::player.isInitialized) runCatching { player.removeListener(playerListener) }
         if (::libraryCallback.isInitialized) libraryCallback.release()
         if (::mediaLibrarySession.isInitialized) runCatching { mediaLibrarySession.release() }
         if (::player.isInitialized) runCatching { player.release() }

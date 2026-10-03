@@ -15,10 +15,10 @@ enum class AppTheme(
     AMETHYST("Royal Amethyst", "Imperial plum with radiant orchid", "#C084FC"),
     MIDNIGHT("Midnight Blue", "Deep navy with modern azure blue", "#3B82F6"),
     TITANIUM("Luxury Titanium", "Precision matte titanium with slate platinum", "#E2E8F0"),
-    APPLE_DARK("Apple Music Dark", "BitChord signature true black with Apple Crimson Red", "#FA2D48"),
+    APPLE_DARK("Apple Music Dark", "Ultra-deep true black with Apple Crimson Red", "#FA2D48"),
     APPLE_LIGHT("Apple Music Light", "Clean Cupertino iOS light mode with Apple Crimson Red", "#FA2D48"),
-    BITCHORD_CYAN("BitChord Electric", "High-contrast midnight cyber with electric cyan", "#00E5FF"),
-    BITCHORD_PURPLE("BitChord Violet", "BitChord deep space midnight with neon violet", "#B388FF"),
+    BITCHORD_CYAN("Electric Cyan", "High-contrast midnight cyber with electric cyan", "#00E5FF"),
+    BITCHORD_PURPLE("Neon Violet", "Deep space midnight with radiant violet", "#B388FF"),
     ;
 
     companion object {

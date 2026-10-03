@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Unlocks high refresh rate (90Hz / 120Hz ProMotion / 144Hz) rendering on supported displays.
-     * Ported and optimized from BitChord performance architecture.
+     * Unlocks maximum display panel refresh rates.
      */
     private fun applyPerformanceMode(enabled: Boolean, refreshRate: Int, composeView: View) {
         val supportedRefreshRate = composeView.display.resolvePerformanceRefreshRate(refreshRate)

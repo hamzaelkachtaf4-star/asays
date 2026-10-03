@@ -19,3 +19,6 @@ app/release/
 
 # verrou du harness vibe.sh
 .vibe.lock
+
+# AI agent workspace configs
+.agents/

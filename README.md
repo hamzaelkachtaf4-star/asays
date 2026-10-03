@@ -65,46 +65,54 @@
 
 ## 🌟 Key Highlights & Engineering Features
 
-### 🎛️ 1. BitChord-Style Automix & DJ Transitions
-- **Dual-Player ExoPlayer Engine**: Seamlessly overlaps consecutive tracks without restarting the media pipeline or suffering Android audio-focus drops. The outgoing track tail plays from local cache while the incoming track starts smoothly.
-- **5 Transition Curves**:
+### 📡 1. Seamless Multi-Device Connect (Spotify Connect-Grade Experience)
+- **Real-Time Cross-Device Synchronization**: Integrated Server-Sent Events (SSE) stream keeping local playback state, queues, and device clusters in millisecond sync across phones, PCs, web players, and connected speakers.
+- **Dynamic Remote Control Handoff**: When another device takes over playback, this phone gracefully pauses local audio and transitions into a full-featured remote control interface with zero audio stutter or device contention.
+- **Single-Source-of-Truth Coroutine Architecture**: Reactive `combine` observer coordinating active device states on `Dispatchers.Main.immediate` to ensure rock-solid Media3 session safety.
+- **Resilient Exponential Backoff**: Intelligent auto-reconnect logic (3s up to 60s) safeguarding battery life and network bandwidth when hub servers are unavailable.
+
+### 🎛️ 2. Studio DJ Automix & Gapless Audio Transitions
+- **Dual-Player ExoPlayer Engine**: Seamlessly overlaps consecutive tracks without restarting the media pipeline or suffering Android audio-focus drops. The outgoing track tail plays from local cache while the incoming track preloads and starts smoothly.
+- **5 Professional Transition Curves**:
   - **Equal-Power Cosine / Sine** ($\cos^2(t) + \sin^2(t) = 1$): Professional broadcast standard preserving continuous acoustic energy.
   - **Quadratic Melt**: Smooth exponential dip and resurgence for ambient transitions.
   - **Exponential Rise**: High-energy dance and hip-hop build-ups.
   - **Zero-Gap Slam**: Hard cut with zero millisecond latency or silence gap.
   - **Standard Crossfade**: Linear audio blend.
 - **Dynamic Bridge Sheet**: Per-transition duration (2s–12s) and curve overrides, with immediate preview and optional playlist-wide application.
+- **Double-Skip & Race-Shielded Lifecycle**: Guaranteed cleanup with `try/finally` blocks and generation counters preventing accidental multi-skips during fast navigation.
 
-### 🔀 2. Spotify-Grade Smart Shuffle & FIFO Queue
+### 🔀 3. Spotify-Grade Smart Shuffle & FIFO Queue Priority
 - **Non-Destructive In-Place Reordering**: Toggling shuffle during playback dynamically updates upcoming items using `removeMediaItems` / `addMediaItems` without timeline reconstruction (`setMediaItems`), eliminating audio buffering stutters.
 - **FIFO User Queue Priority (`isUserQueued`)**: Tracks queued manually are inserted immediately after the active song in FIFO order (`NEXT IN QUEUE`), neatly separated from context albums/playlists (`NEXT FROM ALBUM`).
 - **Continuous Fluid Drag-and-Drop**: Gesture-resilient item reordering in `QueueSheet` backed by stable `QueueEntry` IDs and haptic tactile feedback.
 
-### 🎤 3. Real-Time Synced Lyrics & Calibration
+### 🎤 4. Real-Time Synced Lyrics & Live Calibration
 - **LRCLIB Integration**: Instant synchronized line-by-line lyrics matching with duration validation ($\pm 6\text{s}$).
 - **Millisecond Timing Calibration**: Integrated timing slider allowing $-5000\text{ms}$ to $+5000\text{ms}$ live offset adjustments.
 - **Cache-Resilient Storage (`CustomLyricsStore`)**: Calibrations and custom lyrics are persisted in isolated app storage—immune to cache cleanups.
 - **Navidrome Companion Export**: 1-tap `.lrc` generator matching standard `[mm:ss.xx]` tags for easy synchronization with your server library.
 
-### 🚗 4. Android Auto Coolwalk Integration
-- **Native `MediaLibraryService` Architecture**: Deep system integration with vehicle infotainment displays.
-- **Sandboxed Car Artwork**: Custom `ArtworkContentProvider` serving vehicle displays (`content://com.naviify.app.artwork/...`) without file-URI permission blocks.
-- **Dedicated Car Action Controls**: Favorite toggles, shuffle controls, and playlist browsing optimized for safe driving.
-
-### ⚡ 5. 120Hz Hyper-Smooth UI Architecture
+### ⚡ 5. 120Hz Hyper-Smooth & Zero-Jank UI Architecture
 - **Zero UI-Thread Disk I/O**: In-memory $O(1)$ hash map lookup (`coverFileIndex`) replaces synchronous flash storage queries during scroll passes.
+- **Isolated Recomposition Snapshots (`NowPlayingChrome`)**: High-frequency playback ticks (250ms) are separated from the main screen layout, eliminating full-screen recomposition storms and conserving battery life.
 - **Coil Hardware Bitmaps (RGB_565)**: Reduces memory overhead by 50% without visible degradation on mobile AMOLED screens.
 - **Zero-Allocation Geometry**: Replaced per-frame cubic bezier and `Path()` allocations with GPU primitive draw commands.
 - **Stale-While-Revalidate Caching**: Instantaneous 0ms cold-start and seamless tab switching.
 
-### 🌐 6. Dual-Network Reactive Failover
+### 🚗 6. Android Auto Coolwalk Integration
+- **Native `MediaLibraryService` Architecture**: Deep system integration with vehicle infotainment displays.
+- **Sandboxed Car Artwork**: Custom `ArtworkContentProvider` serving vehicle displays (`content://com.naviify.app.artwork/...`) without file-URI permission blocks.
+- **Dedicated Car Action Controls**: Favorite toggles, shuffle controls, and playlist browsing optimized for safe driving.
+
+### 🌐 7. Dual-Network Reactive Failover & Enterprise Security
 - **LAN vs Tailscale Fast-Path**: Probes local Wi-Fi fast-path (<350ms) and seamlessly switches to secure Tailscale VPN IP when leaving home.
 - **Android KeyStore AES-256-GCM**: Hardware-backed cryptographic protection for server passwords and API tokens.
 - **Navidrome / OpenSubsonic REST API**: Full support for salt + token MD5 authentication, scrobbling, and remote playlist manipulation.
 
-### 🤖 7. Home Server & Hermes AI Integration
-- **Direct Bare Git Sync**: Built-in synchronization with local server bare git repositories (`/srv/git/naviify.git`).
-- **Remote Vibe Coding**: Seamless collaboration with home server agent via Telegram and `vibe.sh`, enabling remote features development from anywhere.
+### 🛡️ 8. Zero-Crash Policy & Engine Hardening
+- **SupervisorJob Crash Shielding**: Every network and playback coroutine is isolated; network dropouts never terminate UI or audio pipelines.
+- **Media3 Lifecycle Cleanliness**: Strict listener detachment prior to `player.release()`, avoiding background service memory leaks and orphaned listeners.
 
 ---
 
@@ -231,5 +239,4 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## 📄 License & Attribution
 
-- Built with ❤️ for self-hosted audio enthusiasts.
-- Incorporates concepts and inspirations from **Spotify Mobile**, **BitChord Automix Engine**, and the **OpenSubsonic** community.
+- Built with ❤️ for self-hosted audio enthusiasts, delivering a premium Spotify-grade music and remote control experience for the **OpenSubsonic** & **Navidrome** ecosystems.

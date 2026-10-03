@@ -91,6 +91,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -153,6 +154,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.naviify.app.data.connect.ConnectCluster
 import com.naviify.app.domain.model.LyricsLineData
 import com.naviify.app.domain.model.Track
 import com.naviify.app.domain.playback.PlaybackRepeatMode
@@ -181,6 +183,46 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/**
+ * Everything the Now Playing chrome renders EXCEPT the playback clock.
+ *
+ * [PlayerUiState] is re-emitted on every position tick; projecting it onto this
+ * snapshot (deduplicated) means the screen only recomposes when something visible
+ * actually changes. `positionMs` / `durationMs` stay isolated in cold flows that
+ * only the seek bar and lyrics collect.
+ */
+@Immutable
+private data class NowPlayingChrome(
+    val track: Track?,
+    val isPlaying: Boolean,
+    val isShuffleEnabled: Boolean,
+    val repeatMode: PlaybackRepeatMode,
+    val error: String?,
+    val isMixBlending: Boolean,
+    val mixProgress: Float,
+    val mixOutgoingTrack: Track?,
+)
+
+private fun PlayerUiState.toChrome() = NowPlayingChrome(
+    track = currentTrack,
+    isPlaying = isPlaying,
+    isShuffleEnabled = isShuffleEnabled,
+    repeatMode = repeatMode,
+    error = error,
+    isMixBlending = isMixBlending,
+    mixProgress = mixProgress,
+    mixOutgoingTrack = mixOutgoingTrack,
+)
+
+/** Just what the green "Lecture sur ..." row needs from the Connect cluster. */
+@Immutable
+private data class RemoteDeviceBadge(val name: String, val kind: String)
+
+private fun ConnectCluster?.remoteBadge(selfId: String): RemoteDeviceBadge? =
+    this?.devices
+        ?.firstOrNull { it.isActive && it.id != selfId }
+        ?.let { RemoteDeviceBadge(name = it.name, kind = it.kind) }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(
@@ -190,46 +232,41 @@ fun NowPlayingScreen(
     viewModel: PlayerViewModel = hiltViewModel(),
     downloadViewModel: DownloadViewModel = hiltViewModel(),
     playlistsViewModel: PlaylistsViewModel = hiltViewModel(),
+    connectViewModel: ConnectDevicesViewModel = hiltViewModel(),
 ) {
-    val trackDelegate by remember(viewModel) {
-        viewModel.state.map { it.currentTrack }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.currentTrack)
-    val track = trackDelegate
+    // One subscription for all the static chrome (track, transport toggles,
+    // error, automix blend) instead of one collector per field.
+    val chrome by remember(viewModel) {
+        viewModel.state.map { it.toChrome() }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.toChrome())
+    val track = chrome.track
+    val isPlaying = chrome.isPlaying
+    val isShuffleEnabled = chrome.isShuffleEnabled
+    val repeatMode = chrome.repeatMode
+    val error = chrome.error
+    val isMixBlending = chrome.isMixBlending
+    val mixProgress = chrome.mixProgress
+    val mixOutgoingTrack = chrome.mixOutgoingTrack
 
-    val isPlaying by remember(viewModel) {
-        viewModel.state.map { it.isPlaying }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.isPlaying)
-
-    val isShuffleEnabled by remember(viewModel) {
-        viewModel.state.map { it.isShuffleEnabled }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.isShuffleEnabled)
-
-    val repeatMode by remember(viewModel) {
-        viewModel.state.map { it.repeatMode }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.repeatMode)
-
-    val error by remember(viewModel) {
-        viewModel.state.map { it.error }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.error)
-
-    val isMixBlending by remember(viewModel) {
-        viewModel.state.map { it.isMixBlending }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.isMixBlending)
-
-    val mixProgress by remember(viewModel) {
-        viewModel.state.map { it.mixProgress }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.mixProgress)
-
-    val mixOutgoingTrack by remember(viewModel) {
-        viewModel.state.map { it.mixOutgoingTrack }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(initialValue = viewModel.state.value.mixOutgoingTrack)
-
+    // High-frequency clock: never read here, only handed down to the leaf
+    // composables (seek bar, lyrics) that actually need to re-render per tick.
     val positionFlow = remember(viewModel) {
         viewModel.state.map { it.positionMs }.distinctUntilChanged()
     }
     val durationFlow = remember(viewModel) {
         viewModel.state.map { it.durationMs }.distinctUntilChanged()
     }
+
+    // Le cluster change a chaque battement du hub (position, lastSeen) : on n'en
+    // garde que l'appareil distant qui joue, pour ne pas tout redessiner toutes
+    // les deux secondes.
+    val activeRemote by remember(connectViewModel) {
+        connectViewModel.cluster
+            .map { it.remoteBadge(connectViewModel.selfId) }
+            .distinctUntilChanged()
+    }.collectAsStateWithLifecycle(
+        initialValue = connectViewModel.cluster.value.remoteBadge(connectViewModel.selfId),
+    )
     val lyricsState by viewModel.lyricsState.collectAsStateWithLifecycle()
     val lyricsBlurEnabled by viewModel.lyricsBlurEnabled.collectAsStateWithLifecycle()
     val artistState by viewModel.artistState.collectAsStateWithLifecycle()
@@ -394,10 +431,8 @@ fun NowPlayingScreen(
 
                     // Comme sur Spotify : la ligne verte de l'appareil qui joue,
                     // tout en bas de la fiche. Un appui ouvre la feuille Connect.
-                    val connectVm: ConnectDevicesViewModel = hiltViewModel()
-                    val connectCluster by connectVm.cluster.collectAsStateWithLifecycle()
-                    val remoteDevice = connectCluster?.devices
-                        ?.firstOrNull { it.isActive && it.id != connectVm.selfId }
+                    // (Copie locale : pas de smart cast sur une propriete deleguee.)
+                    val remoteDevice = activeRemote
                     if (remoteDevice != null) {
                         Row(
                             modifier = Modifier
@@ -465,7 +500,15 @@ fun NowPlayingScreen(
     }
 
     if (showQueue) {
-        val queueState by viewModel.state.collectAsStateWithLifecycle()
+        // The queue never shows the clock: drop it so the open sheet does not
+        // re-render the whole (possibly long) list on every position tick.
+        val queueState by remember(viewModel) {
+            viewModel.state
+                .map { it.copy(positionMs = 0L, durationMs = 0L) }
+                .distinctUntilChanged()
+        }.collectAsStateWithLifecycle(
+            initialValue = viewModel.state.value.copy(positionMs = 0L, durationMs = 0L),
+        )
         QueueSheet(
             state = queueState,
             onDismiss = { showQueue = false },
@@ -479,7 +522,7 @@ fun NowPlayingScreen(
     }
     if (showDevices) {
         ConnectDevicesSheet(
-            viewModel = hiltViewModel(),
+            viewModel = connectViewModel,
             onDismiss = { showDevices = false },
         )
     }

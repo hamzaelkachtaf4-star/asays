@@ -40,10 +40,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.naviify.app.data.connect.ConnectDevice
-import com.naviify.app.ui.theme.ConnectGreen
 import com.naviify.app.ui.theme.SurfaceCardHigh
 import com.naviify.app.ui.theme.TextPrimary
 import com.naviify.app.ui.theme.TextSecondary
+
+/** Le vert de Spotify, en dur : le theme de l'appli peut etre rouge. */
+private val ConnectGreen = Color(0xFF1ED760)
 
 /**
  * « Ecouter sur » : la meme chose que le choix d'appareil d'une enceinte
@@ -52,9 +54,6 @@ import com.naviify.app.ui.theme.TextSecondary
  * sur lui a distance.
  */
 @OptIn(ExperimentalMaterial3Api::class)
-/** Le vert de Spotify, en dur : le theme de l'appli peut etre rouge. */
-private val ConnectGreen = Color(0xFF1ED760)
-
 @Composable
 fun ConnectDevicesSheet(
     viewModel: ConnectDevicesViewModel,

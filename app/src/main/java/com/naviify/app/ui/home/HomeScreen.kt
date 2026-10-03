@@ -289,7 +289,7 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Access Section with BitChord Style View Switcher (Grid vs List)
+            // Quick Access Section with Dynamic View Switcher (Grid vs List)
             if (state.quickGridItems.isNotEmpty()) {
                 item(key = "header_quick_access") {
                     Row(
@@ -374,7 +374,7 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // Horizontal scrolling shelves of quick items (BitChord RecentShelf style)
+                // Horizontal scrolling shelves of quick items
                 item(key = "quick_access_list_carousel") {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 4.dp),

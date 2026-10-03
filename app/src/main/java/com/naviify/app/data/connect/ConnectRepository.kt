@@ -8,6 +8,7 @@ import com.naviify.app.core.network.ServerUrlRouter
 import com.naviify.app.core.network.SessionStateHolder
 import com.naviify.app.core.network.normalizeServerUrl
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -128,41 +129,88 @@ class ConnectRepository @Inject constructor(
         onCommand: (ConnectCommand) -> Unit,
         onTransfer: (ConnectPlayerState) -> Unit,
     ) {
+        var backoffMs = RETRY_MS
         while (scope.isActive) {
-            val base = hubBase()
+            val base = runCatching { hubBase() }.getOrNull()
             if (base == null) {
                 delay(RETRY_MS)
                 continue
             }
-            register(base)
-            client.events(base, deviceId).collect { event ->
-                when (event) {
-                    is ConnectEvent.Cluster -> _cluster.value = event.cluster
-                    is ConnectEvent.Hello -> Unit
-                    is ConnectEvent.Command -> onCommand(event.command)
-                    is ConnectEvent.Transferred -> event.transfer.player?.let(onTransfer)
+            // Chaque tour est blinde : une annonce refusee, un hub qui repond
+            // n'importe quoi ou un ordre mal forme ne doivent jamais faire sortir
+            // de cette boucle, sinon plus aucun evenement n'arrive jusqu'au
+            // prochain lancement de l'application.
+            val registered = try {
+                register(base)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                false
+            }
+            if (!registered) {
+                // Hub injoignable : on espace les tentatives (3 s, 6 s, 12 s...
+                // jusqu'a 60 s) pour ne pas vider la batterie a marteler le reseau.
+                delay(backoffMs)
+                backoffMs = (backoffMs * 2).coerceAtMost(MAX_BACKOFF_MS)
+                continue
+            }
+            var received = false
+            try {
+                client.events(base, deviceId).collect { event ->
+                    received = true
+                    try {
+                        when (event) {
+                            is ConnectEvent.Cluster -> _cluster.value = event.cluster
+                            is ConnectEvent.Hello -> Unit
+                            is ConnectEvent.Command -> onCommand(event.command)
+                            is ConnectEvent.Transferred -> event.transfer.player?.let(onTransfer)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // Un evenement indigeste est ignore, le flux continue.
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Flux casse : traite comme une fin de flux, on retente plus bas.
             }
             // Le flux s'est termine (hub redemarre, reseau coupe) : on retente.
-            delay(RETRY_MS)
+            // Une connexion qui a vraiment servi remet l'attente a zero.
+            if (received) {
+                backoffMs = RETRY_MS
+                delay(RETRY_MS)
+            } else {
+                delay(backoffMs)
+                backoffMs = (backoffMs * 2).coerceAtMost(MAX_BACKOFF_MS)
+            }
         }
     }
 
     private suspend fun heartbeatLoop(stateProvider: () -> ConnectPlayerState) {
         while (scope.isActive) {
             delay(HEARTBEAT_MS)
-            if (isActive) publish(stateProvider())
+            // Un instantane rate n'est pas grave ; perdre le battement pour de bon, si.
+            try {
+                if (isActive) publish(stateProvider())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                Unit
+            }
         }
     }
 
-    private fun register(base: String) {
+    /** Annonce ce telephone au hub. Renvoie `false` si le hub ne l'a pas accepte. */
+    private fun register(base: String): Boolean {
         val device = ConnectDevice(
             id = deviceId,
             name = deviceName,
             kind = "phone",
             platform = "Android ${Build.VERSION.RELEASE}",
         )
-        client.post(base, "/api/register", json.encodeToString(ConnectDevice.serializer(), device))
+        return client.post(base, "/api/register", json.encodeToString(ConnectDevice.serializer(), device))
     }
 
     /** Meme hote que le serveur actif, port dedie au hub. */
@@ -196,5 +244,6 @@ class ConnectRepository @Inject constructor(
         const val HUB_PORT = 3030
         const val HEARTBEAT_MS = 2_000L
         const val RETRY_MS = 3_000L
+        const val MAX_BACKOFF_MS = 60_000L
     }
 }

@@ -342,7 +342,7 @@ class PlayerQueueStore private constructor(
     }
 
     /**
-     * Smart shuffle inspired by Spotify & BitChord:
+     * Smart shuffle with artist de-clustering:
      * 1. Fisher-Yates randomization
      * 2. Anti-identity shuffle prevention (guaranteed permutation for lists with >1 item)
      * 3. Artist de-clumping (prevents tracks from same artist playing consecutively when possible)

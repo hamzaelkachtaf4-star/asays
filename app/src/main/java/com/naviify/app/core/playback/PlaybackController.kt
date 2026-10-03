@@ -123,6 +123,10 @@ class PlaybackController @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var tailPlayer: ExoPlayer? = null
     private var transitionJob: Job? = null
+    // Incremente a chaque transition lancee ou annulee : le bloc finally d'une
+    // transition ne nettoie que s'il est toujours la plus recente (le dispatcher
+    // Main.immediate peut l'executer avant meme que transitionJob soit assigne).
+    private var transitionGeneration = 0
     private var isMixTransitionTriggered = false
     private var isTailPrewarmed = false
     // Reglage manuel : intro du morceau entrant a sauter, memorisee au declenchement
@@ -155,6 +159,7 @@ class PlaybackController @Inject constructor(
     }
 
     private fun cancelTransition() {
+        transitionGeneration++
         transitionJob?.cancel()
         transitionJob = null
         tailPlayer?.let { tp ->
@@ -288,16 +293,24 @@ class PlaybackController @Inject constructor(
 
     /** Tears down the session binding and listener. */
     fun disconnect() {
-        cancelTransition()
-        tailPlayer?.release()
-        tailPlayer = null
-        controller?.let { session ->
-            session.removeListener(controllerListener)
-            session.release()
+        // The sleep timer job would otherwise keep ticking and later call
+        // pausePlayback() against a controller that no longer exists.
+        cancelSleepTimer()
+        try {
+            cancelTransition()
+        } finally {
+            // Always free the secondary decoder, even if cancelTransition threw.
+            val tail = tailPlayer
+            tailPlayer = null
+            tail?.let { runCatching { it.release() } }
+            controller?.let { session ->
+                runCatching { session.removeListener(controllerListener) }
+                runCatching { session.release() }
+            }
+            controller = null
+            connectRequested = false
+            stopTicker()
         }
-        controller = null
-        connectRequested = false
-        stopTicker()
     }
 
     /** Connects to the playback service; safe to call repeatedly and from any screen. */
@@ -678,103 +691,110 @@ class PlaybackController @Inject constructor(
         transitionMode: PlaylistMixMode,
         config: PlaylistMixConfig,
     ) {
+        val generation = ++transitionGeneration
         transitionJob?.cancel()
         transitionJob = scope.launch {
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, "Starting DJ mix transition: '${fromTrack.title}' -> '${toTrack.title}' ($transitionMode, ${overlapMs}ms)")
-            }
-
-            // Reglage manuel : l'entrant demarre apres son intro (seek applique des
-            // que le morceau est charge, voir onMediaItemTransition).
-            pendingIntroSkipMs = config.introSkipMs.coerceIn(0L, PlaylistMixConfig.MAX_INTRO_SKIP_MS)
-
-            if (transitionMode == PlaylistMixMode.SLAM) {
-                // Slam: Instant drop on the beat with zero silence
-                session.seekToNextMediaItem()
-                session.volume = 1.0f
-                isMixTransitionTriggered = false
-                isTailPrewarmed = false
-                store.setMixBlending(false)
-                return@launch
-            }
-
-            val tail = getOrCreateTailPlayer()
-
-            // Verify tail is ready; if not pre-warmed, prepare and wait for STATE_READY
-            // while session continues playing uninterrupted at full volume!
-            val isReady = if (isTailPrewarmed && tail.playbackState == Player.STATE_READY) {
-                true
-            } else {
-                runCatching {
-                    val fromMediaItem = itemMapper.trackItem(fromTrack)
-                    if (tail.currentMediaItem?.mediaId != fromMediaItem.mediaId) {
-                        tail.stop()
-                        tail.clearMediaItems()
-                        tail.setMediaItem(fromMediaItem, currentPosMs)
-                        tail.volume = 0f
-                        tail.playWhenReady = false
-                        tail.prepare()
-                    }
-                    var attempts = 0
-                    while (tail.playbackState != Player.STATE_READY && attempts < 25 && isActive) {
-                        delay(20L)
-                        attempts++
-                    }
-                    tail.playbackState == Player.STATE_READY
-                }.getOrDefault(false)
-            }
-
-            if (!isReady || !isActive) {
-                if (BuildConfig.DEBUG) Log.w(TAG, "Tail player was not ready in time; falling back to direct seek")
-                session.seekToNextMediaItem()
-                session.volume = 1.0f
-                isMixTransitionTriggered = false
-                isTailPrewarmed = false
-                store.setMixBlending(false)
-                return@launch
-            }
-
-            // 1. Unmute and start tail FIRST so fromTrack audio continues playing without even 1ms gap
-            tail.volume = 1.0f
-            tail.playWhenReady = true
-            tail.play()
-
-            // 2. Main player starts incoming track at 0 volume (inaudible while buffering)
-            session.volume = 0.0f
-            session.seekToNextMediaItem()
-
-            // 3. Mark store as blending for UI animations
-            store.setMixBlending(true, 0f, fromTrack)
-
-            val startTime = SystemClock.elapsedRealtime()
-            val totalSpanMs = overlapMs.toFloat()
-
-            while (isActive) {
-                val elapsed = (SystemClock.elapsedRealtime() - startTime).coerceAtLeast(0L)
-                val progress = (elapsed.toFloat() / totalSpanMs).coerceIn(0f, 1f)
-
-                val (outGain, inGain) = calculateMixGains(progress, transitionMode, config.equalPowerVolume)
-
-                tail.volume = outGain.coerceIn(0f, 1f)
-                session.volume = inGain.coerceIn(0f, 1f)
-                store.setMixBlending(true, progress, fromTrack)
-
-                if (progress >= 1f || tail.playbackState == Player.STATE_ENDED || tail.playbackState == Player.STATE_IDLE) {
-                    break
+            try {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Starting DJ mix transition: '${fromTrack.title}' -> '${toTrack.title}' ($transitionMode, ${overlapMs}ms)")
                 }
-                delay(30L)
-            }
 
-            runCatching {
-                tail.stop()
-                tail.clearMediaItems()
-            }
-            session.volume = 1.0f
-            isMixTransitionTriggered = false
-            isTailPrewarmed = false
-            store.setMixBlending(false)
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, "DJ mix transition completed: now playing '${toTrack.title}' at 1.0 volume")
+                // Reglage manuel : l'entrant demarre apres son intro (seek applique des
+                // que le morceau est charge, voir onMediaItemTransition).
+                pendingIntroSkipMs = config.introSkipMs.coerceIn(0L, PlaylistMixConfig.MAX_INTRO_SKIP_MS)
+
+                if (transitionMode == PlaylistMixMode.SLAM) {
+                    // Slam: Instant drop on the beat with zero silence
+                    session.seekToNextMediaItem()
+                    return@launch // volume / flags / tail are reset in finally
+                }
+
+                val tail = getOrCreateTailPlayer()
+
+                // Verify tail is ready; if not pre-warmed, prepare and wait for STATE_READY
+                // while session continues playing uninterrupted at full volume!
+                val isReady = if (isTailPrewarmed && tail.playbackState == Player.STATE_READY) {
+                    true
+                } else {
+                    runCatching {
+                        val fromMediaItem = itemMapper.trackItem(fromTrack)
+                        if (tail.currentMediaItem?.mediaId != fromMediaItem.mediaId) {
+                            tail.stop()
+                            tail.clearMediaItems()
+                            tail.setMediaItem(fromMediaItem, currentPosMs)
+                            tail.volume = 0f
+                            tail.playWhenReady = false
+                            tail.prepare()
+                        }
+                        var attempts = 0
+                        while (tail.playbackState != Player.STATE_READY && attempts < 25 && isActive) {
+                            delay(20L)
+                            attempts++
+                        }
+                        tail.playbackState == Player.STATE_READY
+                    }.getOrDefault(false)
+                }
+
+                // Cancelled while waiting (user skipped, paused, seeked): whoever
+                // cancelled us already moved the player, so do NOT skip again.
+                if (!isActive) return@launch
+
+                if (!isReady) {
+                    if (BuildConfig.DEBUG) Log.w(TAG, "Tail player was not ready in time; falling back to direct seek")
+                    session.seekToNextMediaItem()
+                    return@launch // volume / flags / tail are reset in finally
+                }
+
+                // 1. Unmute and start tail FIRST so fromTrack audio continues playing without even 1ms gap
+                tail.volume = 1.0f
+                tail.playWhenReady = true
+                tail.play()
+
+                // 2. Main player starts incoming track at 0 volume (inaudible while buffering)
+                session.volume = 0.0f
+                session.seekToNextMediaItem()
+
+                // 3. Mark store as blending for UI animations
+                store.setMixBlending(true, 0f, fromTrack)
+
+                val startTime = SystemClock.elapsedRealtime()
+                val totalSpanMs = overlapMs.toFloat()
+
+                while (isActive) {
+                    val elapsed = (SystemClock.elapsedRealtime() - startTime).coerceAtLeast(0L)
+                    val progress = (elapsed.toFloat() / totalSpanMs).coerceIn(0f, 1f)
+
+                    val (outGain, inGain) = calculateMixGains(progress, transitionMode, config.equalPowerVolume)
+
+                    tail.volume = outGain.coerceIn(0f, 1f)
+                    session.volume = inGain.coerceIn(0f, 1f)
+                    store.setMixBlending(true, progress, fromTrack)
+
+                    if (progress >= 1f || tail.playbackState == Player.STATE_ENDED || tail.playbackState == Player.STATE_IDLE) {
+                        break
+                    }
+                    delay(30L)
+                }
+
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "DJ mix transition completed: now playing '${toTrack.title}' at 1.0 volume")
+                }
+            } finally {
+                // Runs on completion, early return, exception AND mid-fade
+                // cancellation. Skipped when a newer transition (or cancelTransition,
+                // which cleans up synchronously) has taken ownership in the meantime.
+                if (generation == transitionGeneration) {
+                    tailPlayer?.let { tp ->
+                        runCatching {
+                            tp.stop()
+                            tp.clearMediaItems()
+                        }
+                    }
+                    if (controller === session) runCatching { session.volume = 1.0f }
+                    isMixTransitionTriggered = false
+                    isTailPrewarmed = false
+                    store.setMixBlending(false)
+                }
             }
         }
     }
